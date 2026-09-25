@@ -77,7 +77,8 @@ cd ThemeSwitch
    - **时区**：判断时段所用的时区
    - **参考时区**：换算提示与菜单「下次切换」所参照的时区（建议设成你自己的真实时区）
    - **切换时间**：转暗 / 转亮两个时间点
-   - **菜单栏时钟**（可选）：开启后菜单栏显示日期 / 星期 / 时间
+   - **菜单栏时钟**（可选）：开启后菜单栏显示日期 / 星期 / 时间；设置窗口里实时预览所选时区的当前时间，
+     时钟关闭时也会照常显示（只是弱化并标注「已关闭」），所以改时区随时都能看到效果
    - **界面语言**（可选）：跟随系统 / English / 简体中文；点「保存」后立即生效（菜单、菜单栏时钟、弹窗、设置窗口）
 
 ### 举个例子
@@ -161,6 +162,8 @@ install.sh / uninstall.sh    安装与卸载
   英文界面直接用 IANA 标识符最后一段（`America/Los_Angeles` → `Los Angeles`）；
   两者都保留兜底，认不出的标识符原样显示、不崩
 - 手动切换只在自动切换**启用**时进入暂停状态；停用时本来就不会自动干预，不存在暂停一说
+- 设置窗口的高度上限是「屏幕可用高度 − 上下边距 − 标题栏」，内容放不下时窗口本身不再变高，
+  改为在表单区域滚动；「恢复默认 / 取消 / 保存」固定在窗口底部、不参与滚动，任何屏幕尺寸下都点得到
 
 ## 开源许可
 
@@ -174,7 +177,7 @@ A tiny macOS menu bar utility that **switches the system light/dark appearance a
 
 Unlike the built-in "Auto" appearance — which follows sunrise/sunset of your **system** timezone — ThemeSwitch is fully independent of it. Useful when your system timezone differs from where you actually live, or when you want a fixed schedule.
 
-Features: configurable timezone and switch times, optional menu bar clock, timezone conversion hints in the settings window, no third-party dependencies.
+Features: configurable timezone and switch times, optional menu bar clock, timezone conversion hints in the settings window, no third-party dependencies. The settings window never grows taller than the screen's visible area — the form scrolls instead, and the Reset / Cancel / Save row stays pinned to the bottom of the window so it is always clickable.
 
 The interface is bilingual (English / Simplified Chinese). It follows the system language by default (English is the default language, `CFBundleDevelopmentRegion`), so every system language other than Chinese gets the English UI — and it can also be pinned in-app to `English` or `简体中文` from the settings window, which then overrides the system language for the menu, the clock, alerts and the settings window itself. The clock format, weekday names and time zone names follow the same app language (24-hour in both languages). Product strings live in `Resources/en.lproj/Localizable.strings` and `Resources/zh-Hans.lproj/Localizable.strings`; the in-app choice is applied at runtime by exchanging `Bundle.main`'s localized lookup and by setting the SwiftUI environment locale.
 

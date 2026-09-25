@@ -70,10 +70,37 @@ private func timeZoneShortName(_ identifier: String) -> String {
 
 // MARK: - 时间与换算
 
-private enum Layout {
+/// 设置窗口的尺寸约束。纯计算、无状态，便于单独编译测试。
+enum Layout {
     /// 窗口内容宽度按语言取值：英文标签更长，520 下输入框和开关文字会被挤得偏窄，560 更舒服。
-    /// 高度仍由 SwiftUI 内容（NSHostingController.fittingSize）决定，不放滚动条、不裁切。
     static var contentWidth: CGFloat { AppLanguage.isChinese ? 520 : 560 }
+
+    /// 内容高度上限相对屏幕可用高度的边距。visibleFrame 已经排除菜单栏与 Dock，
+    /// 这里再留一点空隙，免得窗口紧贴菜单栏或 Dock。
+    static let verticalMargin: CGFloat = 40
+
+    /// 内容高度下限：极小屏幕或 visibleFrame 异常时也不把内容压到不可用
+    /// （底部按钮行始终完整可见）。
+    static let minimumContentHeight: CGFloat = 360
+
+    /// 拿不到屏幕尺寸时的兜底可用高度（例如窗口还没上屏）。
+    static let fallbackVisibleHeight: CGFloat = 900
+
+    /// 内容高度上限 = 屏幕可用高度 - 上下边距 - 窗口装饰（标题栏）高度，再以下限兜底。
+    /// 内容比上限高时多出来的部分交给设置视图里的 ScrollView 滚动，窗口本身不会长到屏幕外
+    /// ——曾经就是没这个上限：窗口 1084pt 高、屏幕放不下，底部的「保存」按钮既点不到也没有滚动条。
+    /// visibleHeight 非有限值或非正数（拿不到屏幕）时退回 fallbackVisibleHeight。
+    static func maxContentHeight(forVisibleHeight visibleHeight: CGFloat, chromeHeight: CGFloat = 0) -> CGFloat {
+        let usable = visibleHeight.isFinite && visibleHeight > 0 ? visibleHeight : fallbackVisibleHeight
+        let chrome = chromeHeight.isFinite ? max(0, chromeHeight) : 0
+        return max(minimumContentHeight, usable - verticalMargin - chrome)
+    }
+
+    /// 当前屏幕的可用高度；拿不到屏幕（窗口还没上屏）时退回兜底值。
+    /// AppKit 侧还会按窗口真正所在屏幕再算一次，这里只负责让 SwiftUI 侧有个合理上限。
+    static func currentVisibleHeight() -> CGFloat {
+        NSScreen.main?.visibleFrame.height ?? fallbackVisibleHeight
+    }
 }
 
 /// 换算提示里的「钟点」：纯数字，固定 24 小时制。
@@ -320,66 +347,67 @@ private struct SettingsView: View {
 
     var body: some View {
         VStack(spacing: 0) {
-            Form {
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Toggle("settings.general.enable", isOn: $model.enabled)
-                        Toggle("settings.general.launch_at_login", isOn: $model.launchAtLogin)
-                        Text("settings.general.launch_at_login_hint")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                        HStack(spacing: 12) {
-                            Text("settings.general.language")
-                                .fixedSize()
-                            Picker("settings.general.language", selection: $model.language) {
-                                // 语言名一律用各自的母语写法（English / 简体中文），两套 .strings 里取值相同、
-                                // 不随界面语言翻译 —— 这样不管界面当前是什么语言，用户都认得出自己的语言；
-                                // 只有「跟随系统」跟当前语言走。
-                                Text("language.follow_system").tag(LanguageOverride.systemValue)
-                                Text("language.en").tag(LanguageOverride.englishIdentifier)
-                                Text("language.zh_hans").tag(LanguageOverride.simplifiedChineseIdentifier)
+            // 只有表单参与滚动：底部的「恢复默认 / 取消 / 保存」固定在窗口底部不滚动，
+            // 任何屏幕尺寸下都点得到（以前窗口会一直长到屏幕外，这几个按钮就再也点不到了）。
+            // 内容不超高时 ScrollView 不多占高度、也不会出现滚动条
+            // （macOS 默认是滚动时才显示的浮层滚动条），窗口仍按内容自适应高度。
+            ScrollView {
+                Form {
+                    Section {
+                        VStack(alignment: .leading, spacing: 12) {
+                            Toggle("settings.general.enable", isOn: $model.enabled)
+                            Toggle("settings.general.launch_at_login", isOn: $model.launchAtLogin)
+                            HStack(spacing: 12) {
+                                Text("settings.general.language")
+                                    .fixedSize()
+                                Picker("settings.general.language", selection: $model.language) {
+                                    // 语言名一律用各自的母语写法（English / 简体中文），两套 .strings 里取值相同、
+                                    // 不随界面语言翻译 —— 这样不管界面当前是什么语言，用户都认得出自己的语言；
+                                    // 只有「跟随系统」跟当前语言走。
+                                    Text("language.follow_system").tag(LanguageOverride.systemValue)
+                                    Text("language.en").tag(LanguageOverride.englishIdentifier)
+                                    Text("language.zh_hans").tag(LanguageOverride.simplifiedChineseIdentifier)
+                                }
+                                .labelsHidden()
+                                .pickerStyle(.menu)
+                                .frame(maxWidth: .infinity, alignment: .leading)
                             }
-                            .labelsHidden()
-                            .pickerStyle(.menu)
-                            .frame(maxWidth: .infinity, alignment: .leading)
+                            Text("settings.general.language_hint")
+                                .font(.callout)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
                         }
-                        Text("settings.general.language_hint")
-                            .font(.callout)
-                            .foregroundStyle(.secondary)
+                        .padding(.vertical, 2)
+                    } header: {
+                        Text("settings.section.general")
+                    } footer: {
+                        Text("settings.general.footer")
                             .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.vertical, 2)
-                } header: {
-                    Text("settings.section.general")
-                } footer: {
-                    Text("settings.general.footer")
-                        .fixedSize(horizontal: false, vertical: true)
-                }
 
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        HStack(spacing: 12) {
-                            Text("settings.time_zone.label")
-                                .fixedSize()
-                            TimeZoneComboBox(selection: $model.timeZoneID)
-                                .frame(maxWidth: .infinity, alignment: .leading)
+                    Section {
+                        VStack(alignment: .leading, spacing: 12) {
+                            HStack(spacing: 12) {
+                                Text("settings.time_zone.label")
+                                    .fixedSize()
+                                TimeZoneComboBox(selection: $model.timeZoneID)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            HStack(spacing: 12) {
+                                Text("settings.time_zone.reference_label")
+                                    .fixedSize()
+                                TimeZoneComboBox(selection: $model.referenceTimeZoneID)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            hintView
                         }
-                        HStack(spacing: 12) {
-                            Text("settings.time_zone.reference_label")
-                                .fixedSize()
-                            TimeZoneComboBox(selection: $model.referenceTimeZoneID)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                        }
-                        hintView
+                        .padding(.vertical, 2)
+                    } header: {
+                        Text("settings.section.time_zone")
+                    } footer: {
+                        Text("settings.time_zone.footer")
+                            .fixedSize(horizontal: false, vertical: true)
                     }
-                    .padding(.vertical, 2)
-                } header: {
-                    Text("settings.section.time_zone")
-                } footer: {
-                    Text("settings.time_zone.footer")
-                        .fixedSize(horizontal: false, vertical: true)
-                }
 
                     Section {
                         Grid(alignment: .leading, verticalSpacing: 14) {
@@ -416,7 +444,6 @@ private struct SettingsView: View {
                                     .fixedSize()
                                 TimeZoneComboBox(selection: $model.clockTimeZoneID)
                                     .frame(maxWidth: .infinity, alignment: .leading)
-                                    .disabled(!model.showClock)
                             }
                             ClockPreviewLine(showClock: $model.showClock, timeZoneID: $model.clockTimeZoneID)
                         }
@@ -438,6 +465,7 @@ private struct SettingsView: View {
                     }
                 }
                 .formStyle(.grouped)
+            }
 
             Divider()
 
@@ -457,6 +485,9 @@ private struct SettingsView: View {
         // 取的是已保存并生效的语言（activeLanguage），所以窗口里的文案与菜单、弹窗始终一致。
         .environment(\.locale, AppLanguage.locale(for: model.activeLanguage))
         .frame(width: Layout.contentWidth)
+        // 高度上限按当前屏幕可用高度算：超出的部分交给上面的 ScrollView 滚动。
+        // AppKit 侧（FittingHostingController）还会按窗口真正所在的屏幕再兜一次底。
+        .frame(maxHeight: Layout.maxContentHeight(forVisibleHeight: Layout.currentVisibleHeight()))
     }
 
     private func timePicker(label: String, time: Binding<Date>) -> some View {
@@ -524,41 +555,111 @@ private struct SettingsView: View {
 
 // MARK: - 菜单栏时钟预览行
 
-/// 实时预览菜单栏时钟：随开关、时区、当前时间更新；关闭时置灰显示「已关闭」。
+/// 时钟预览的计算结果（纯数据，便于用固定时间戳单独测试）
+struct ClockPreview: Equatable {
+    /// 预览用的时区
+    let timeZone: TimeZone
+    /// 该时区下的日期时间文本（与菜单栏时钟共用同一个格式化函数，两处显示始终一致）
+    let text: String
+    /// 时钟已关闭：仍然算出时间，只是弱化显示并附「已关闭」标记
+    let isOff: Bool
+}
+
+/// 预览用的时区：空值 / "system" / 非法标识都回退系统时区。
+/// 非法标识在保存时会被拦截、不会写进配置，这里回退只是让预览始终有东西可显示。
+func previewTimeZone(for timeZoneID: String) -> TimeZone {
+    let identifier = timeZoneID.trimmingCharacters(in: .whitespacesAndNewlines)
+    if identifier.isEmpty || identifier == "system" {
+        return TimeZone.current
+    }
+    return TimeZone(identifier: identifier) ?? TimeZone.current
+}
+
+/// 时钟预览的纯函数：时间点由调用方给出，方便用固定时间戳测试。
+/// 关闭状态下也照常算出该时区的时间 —— 只显示「已关闭」的话，改时区时预览不会有任何变化，
+/// 很容易被当成「时区没生效」。
+func makeClockPreview(showClock: Bool, timeZoneID: String, at date: Date) -> ClockPreview {
+    let timeZone = previewTimeZone(for: timeZoneID)
+    return ClockPreview(
+        timeZone: timeZone,
+        text: ThemeConfig.clockString(for: date, in: timeZone),
+        isOff: !showClock
+    )
+}
+
+/// 实时预览菜单栏时钟：随开关、时区、当前时间更新；时钟关闭时弱化显示并标注「已关闭」。
+/// 刷新用 Timer + @State 自己驱动，而不是 TimelineView：TimelineView 的 content 闭包会捕获
+/// 创建时的视图值，父视图重渲染时闭包未必被替换，于是「改了时区预览不跟着变」。
+/// 这里每次 tick 都让 body 按当前绑定值重算，结构上就读不到旧值。
 private struct ClockPreviewLine: View {
     @Binding var showClock: Bool
     @Binding var timeZoneID: String
 
+    /// 每秒一跳的「现在」，与 AppDelegate 里菜单栏时钟的定时器同频
+    @State private var now = Date()
+    private static let ticker = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+
     var body: some View {
-        HStack(spacing: 6) {
+        let preview = makeClockPreview(showClock: showClock, timeZoneID: timeZoneID, at: now)
+        return HStack(spacing: 6) {
             Text("settings.clock.preview")
                 .foregroundStyle(.secondary)
                 .fixedSize()
-            if showClock {
-                TimelineView(.periodic(from: .now, by: 1)) { context in
-                    Text(ThemeConfig.clockString(for: context.date, in: previewTimeZone))
-                        .monospacedDigit()
-                        .fixedSize()
-                }
-            } else {
+            Text(preview.text)
+                .monospacedDigit()
+                .fixedSize()
+                .foregroundStyle(preview.isOff ? Color.secondary : Color.primary)
+            if preview.isOff {
                 Text("settings.clock.preview_off")
                     .foregroundStyle(.tertiary)
+                    .fixedSize()
             }
         }
         .font(.callout)
-    }
-
-    /// 预览用的时区：非法标识暂时回退系统时区（保存时会被拦截，不会写入配置）
-    private var previewTimeZone: TimeZone {
-        let identifier = timeZoneID.trimmingCharacters(in: .whitespacesAndNewlines)
-        if identifier.isEmpty || identifier == "system" {
-            return TimeZone.current
-        }
-        return TimeZone(identifier: identifier) ?? TimeZone.current
+        .onReceive(Self.ticker) { now = $0 }
     }
 }
 
 // MARK: - 时区选择框（可搜索 ComboBox）
+
+/// 时区选择框的写入决策：三条回调路径共用一份纯逻辑，便于单独编译测试。
+/// 只判断「该不该写、写什么」，不碰控件，也不碰绑定。
+enum TimeZoneComboWriter {
+    /// 触发写入的回调来源
+    enum Source: Equatable {
+        /// 从下拉列表选中一项，或按下回车：控件里的文本就是用户的选择
+        case action
+        /// 输入过程中：只提交已经合法的标识，让预览与换算提示即时跟随
+        case typing
+        /// 结束编辑：只有用户确实改过文本（typedSinceLastCommit）才提交
+        case endEditing(typedSinceLastCommit: Bool)
+    }
+
+    /// 返回要写进配置的值；nil 表示这次回调不写。
+    /// text 必须是已规范化的值（见 TimeZoneComboBox.normalized）。
+    static func value(normalized text: String, current: String, source: Source) -> String? {
+        // 值没变就不写：省掉一次无谓的模型更新与整窗重渲染
+        guard text != current else { return nil }
+        switch source {
+        case .action:
+            return text
+        case .typing:
+            // 半截文本留在控件里，不进配置；但已经合法的标识要即时提交，
+            // 否则用户还在输入框里时预览、换算提示都不会动。
+            return isValid(text) ? text : nil
+        case .endEditing(let typedSinceLastCommit):
+            // 一次下拉选择可能先触发 comboBoxAction、随后才来 controlTextDidEndEditing；
+            // 后者若带的是选中前的旧文本，就会把刚写进去的新值覆盖回旧值（顺序由 AppKit 决定，
+            // 不可依赖）。只有「用户确实改过文本」的结束编辑才提交，这条路径就写不出旧值。
+            return typedSinceLastCommit ? text : nil
+        }
+    }
+
+    /// 能写进配置的标识：哨兵值 "system"，或任意合法的 IANA 时区标识
+    static func isValid(_ identifier: String) -> Bool {
+        identifier == "system" || TimeZone(identifier: identifier) != nil
+    }
+}
 
 private struct TimeZoneComboBox: NSViewRepresentable {
     @Binding var selection: String
@@ -609,6 +710,9 @@ private struct TimeZoneComboBox: NSViewRepresentable {
 
     final class Coordinator: NSObject, NSComboBoxDelegate {
         var parent: TimeZoneComboBox
+        /// 上一次提交之后用户是否又改过文本。controlTextDidChange 置位、提交成功后清零，
+        /// 用来判断「结束编辑」这条路径该不该写（见 TimeZoneComboWriter.Source.endEditing）。
+        private var typedSinceLastCommit = false
 
         init(_ parent: TimeZoneComboBox) {
             self.parent = parent
@@ -616,14 +720,35 @@ private struct TimeZoneComboBox: NSViewRepresentable {
 
         /// 从下拉列表选中一项，或按下回车
         @objc func comboBoxAction(_ sender: NSComboBox) {
-            parent.selection = TimeZoneComboBox.normalized(sender.stringValue)
+            commit(from: sender, source: .action)
         }
 
-        /// 手输自定义标识后离开输入框时提交。
-        /// 这里刻意不用 controlTextDidChange —— 那会在每敲一个字符时就把半截文本写进配置。
+        /// 输入过程中：只提交已经合法的标识 —— 半截文本（例如刚敲到 "Asia/Shan"）不进配置，
+        /// 免得每敲一个字符就写一次半成品；但输入到合法标识的那一刻就提交，
+        /// 这样时钟预览、换算提示不用等用户离开输入框才更新。
+        @objc func controlTextDidChange(_ notification: Notification) {
+            guard let comboBox = notification.object as? NSComboBox else { return }
+            typedSinceLastCommit = true
+            commit(from: comboBox, source: .typing)
+        }
+
+        /// 手输自定义标识后离开输入框（或关窗、点其它控件）时提交。
+        /// 不用 controlTextDidChange 直接写：见上面那条。
         @objc func controlTextDidEndEditing(_ notification: Notification) {
             guard let comboBox = notification.object as? NSComboBox else { return }
-            parent.selection = TimeZoneComboBox.normalized(comboBox.stringValue)
+            commit(from: comboBox, source: .endEditing(typedSinceLastCommit: typedSinceLastCommit))
+        }
+
+        /// 三条回调路径唯一的写入口：先规范化，再由 TimeZoneComboWriter 决定写不写。
+        private func commit(from comboBox: NSComboBox, source: TimeZoneComboWriter.Source) {
+            let text = TimeZoneComboBox.normalized(comboBox.stringValue)
+            guard let value = TimeZoneComboWriter.value(
+                normalized: text,
+                current: parent.selection,
+                source: source
+            ) else { return }
+            typedSinceLastCommit = false
+            parent.selection = value
         }
     }
 }
@@ -645,6 +770,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         // 否则切完语言再打开设置窗口，标题还停在旧语言、宽度也还是旧语言的。
         window?.title = NSLocalizedString("settings.window.title", comment: "")
         hostingController?.minContentWidth = Layout.contentWidth
+        // 语言可能在两次打开之间被切过（宽度、文案行数都变了），重新套用一次尺寸，
+        // 顺带保证窗口留在屏幕可见区域内；尺寸没变时这两步都是空操作。
+        hostingController?.applyFittingSize()
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
@@ -770,9 +898,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
     }
 }
 
-/// 让 SwiftUI 内容的高度驱动窗口大小：布局后用 hosting view 的 fittingSize 同步
-/// window.contentSize。内容变化（换算提示行数增减等）时窗口随之伸缩，
-/// 不再用固定高度把内容裁进滚动条。本机实测 fittingSize 在窗口创建后即可用。
+/// 让 SwiftUI 内容的高度驱动窗口大小：布局后用 hosting view 的 fittingSize 同步窗口尺寸，
+/// 内容变化（换算提示行数增减、界面语言切换等）时窗口随之伸缩。
+/// 高度同时被屏幕可用高度约束（见 Layout.maxContentHeight）：超出的部分交给内容里的
+/// ScrollView 滚动，窗口不会长到屏幕外面去；换尺寸后还会把窗口收回屏幕可见区域内。
 private final class FittingHostingController<Content: View>: NSHostingController<Content> {
     var minContentWidth: CGFloat = 0
     private var appliedContentSize: NSSize = .zero
@@ -782,10 +911,12 @@ private final class FittingHostingController<Content: View>: NSHostingController
         fitContent()
     }
 
-    /// 窗口创建后立即套用一次，减少首次显示时的尺寸跳动（本机实测此时 fittingSize 已可用）。
+    /// 窗口创建后、以及每次重新打开时套用一次（此时 fittingSize 已可用）：
+    /// 重新打开时也调用，是因为语言可能在两次打开之间被切过，内容宽高都会变。
     func applyFittingSize() {
         view.layoutSubtreeIfNeeded()
         fitContent()
+        keepOnScreen()
     }
 
     private func fitContent() {
@@ -794,7 +925,10 @@ private final class FittingHostingController<Content: View>: NSHostingController
         guard fitting.width > 0, fitting.height > 0 else { return }
         let target = NSSize(
             width: max(minContentWidth, ceil(fitting.width)),
-            height: ceil(fitting.height)
+            height: min(
+                max(ceil(fitting.height), Layout.minimumContentHeight),
+                contentHeightLimit(of: window)
+            )
         )
         if abs(target.width - appliedContentSize.width) < 0.5,
            abs(target.height - appliedContentSize.height) < 0.5
@@ -802,6 +936,44 @@ private final class FittingHostingController<Content: View>: NSHostingController
             return
         }
         appliedContentSize = target
-        window.setContentSize(target)
+        // 以原中心为基准换尺寸（语义同 setContentSize，但不会把窗口顶出屏幕），随后再收回可见区域
+        let frameSize = window.frameRect(forContentRect: NSRect(origin: .zero, size: target)).size
+        var frame = window.frame
+        frame.origin = NSPoint(
+            x: frame.midX - frameSize.width / 2,
+            y: frame.midY - frameSize.height / 2
+        )
+        frame.size = frameSize
+        window.setFrame(frame, display: true)
+        keepOnScreen()
+    }
+
+    /// 窗口内容高度的上限：按窗口所在屏幕的可用高度算，并扣掉标题栏等窗口装饰。
+    /// 拿不到屏幕时用兜底值，宁可给个保守上限也不要让窗口长出屏幕。
+    private func contentHeightLimit(of window: NSWindow) -> CGFloat {
+        let visibleHeight = (window.screen ?? NSScreen.main)?.visibleFrame.height ?? Layout.fallbackVisibleHeight
+        let chromeHeight = window.frame.height - window.contentRect(forFrameRect: window.frame).height
+        return Layout.maxContentHeight(forVisibleHeight: visibleHeight, chromeHeight: chromeHeight)
+    }
+
+    /// 把窗口收回屏幕可见区域内。尺寸没变时也要做：换屏幕、改分辨率之后窗口可能落在屏幕外。
+    /// 窗口比可见区域还高时让顶部对齐可见区域顶部 —— 至少标题栏与红绿灯按钮点得到。
+    func keepOnScreen() {
+        guard let window = view.window, let screen = window.screen ?? NSScreen.main else { return }
+        let visible = screen.visibleFrame
+        var frame = window.frame
+        if frame.height > visible.height {
+            frame.origin.y = visible.maxY - frame.height
+        } else {
+            frame.origin.y = min(max(frame.origin.y, visible.minY), visible.maxY - frame.height)
+        }
+        if frame.width > visible.width {
+            frame.origin.x = visible.minX
+        } else {
+            frame.origin.x = min(max(frame.origin.x, visible.minX), visible.maxX - frame.width)
+        }
+        if frame != window.frame {
+            window.setFrame(frame, display: true)
+        }
     }
 }

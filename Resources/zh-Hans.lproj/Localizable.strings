@@ -53,10 +53,10 @@
 "settings.section.general" = "通用";
 "settings.general.enable" = "启用自动切换";
 "settings.general.launch_at_login" = "登录时自动启动";
-"settings.general.launch_at_login_hint" = "让 ThemeSwitch 在登录时自动启动，无需手动打开。";
-"settings.general.footer" = "「启用自动切换」关闭后 App 不再改变系统外观，只保留菜单栏图标与「立即切换」；「登录时自动启动」在点「保存」后才写入系统。";
+/* footer 文案刻意写短：设置窗口要足够矮，小屏幕上不滚动也放得下。信息量不减，只压缩字数。 */
+"settings.general.footer" = "关闭「启用自动切换」后只保留菜单栏图标与「立即切换」；「登录时自动启动」点「保存」后才写入系统。";
 "settings.general.language" = "界面语言";
-"settings.general.language_hint" = "切换后立即生效：菜单、菜单栏时钟、弹窗与设置窗口都用该语言。若个别界面未刷新，重新打开设置窗口或重启 App 即可。";
+"settings.general.language_hint" = "切换后立即生效；个别界面未刷新时重开本窗口即可。";
 
 /* MARK: 界面语言选项 */
 
@@ -70,28 +70,29 @@
 "settings.section.time_zone" = "时区";
 "settings.time_zone.label" = "时区";
 "settings.time_zone.reference_label" = "参考时区";
-"settings.time_zone.footer" = "「时区」决定切换时刻；「参考时区」只用来把切换时刻换算成你关心的城市时间。两个选择器都可从列表选择，也可直接输入任意 IANA 时区标识（例如 Asia/Tokyo）。";
+"settings.time_zone.footer" = "「时区」决定切换时刻；「参考时区」只把切换时刻换算成你关心的城市时间。两者都可从列表选择，或直接输入 IANA 标识（如 Asia/Tokyo）。";
 
 /* MARK: 设置窗口 —— 切换时间 */
 
 "settings.section.switch_times" = "切换时间";
 "settings.switch_times.to_dark" = "进入深色";
 "settings.switch_times.to_light" = "回到浅色";
-"settings.switch_times.footer" = "按上面所选的时区判断到点切换；两个时间点相同则全天保持浅色、不发生切换。";
+"settings.switch_times.footer" = "按上面所选的时区到点切换；两个时间相同则全天保持浅色。";
 
 /* MARK: 设置窗口 —— 菜单栏时钟 */
 
 "settings.section.clock" = "菜单栏时钟";
 "settings.clock.show" = "显示时钟";
 "settings.clock.time_zone_label" = "时钟时区";
-"settings.clock.footer" = "开启后，菜单栏图标后会显示所选时区的「日期 星期 时间」（24 小时制）。只影响展示，与「启用自动切换」和深浅色判断无关。";
+"settings.clock.footer" = "开启后图标后显示所选时区的「日期 星期 时间」（24 小时制），只影响展示、不影响切换。";
 "settings.clock.preview" = "预览：";
-"settings.clock.preview_off" = "已关闭";
+/* 时钟关闭时跟在预览时间后面，例如「预览：9月25日 周五 11:50（时钟已关闭）」 */
+"settings.clock.preview_off" = "（时钟已关闭）";
 
 /* MARK: 设置窗口 —— 说明 */
 
 "settings.section.about" = "说明";
-"settings.about.body" = "App 会在所选时区的当地时间到达上面两个时间点时切换系统深浅色，完全不受 macOS 系统时区影响。";
+"settings.about.body" = "App 按所选时区的当地时间到点切换系统深浅色，不受 macOS 系统时区影响。";
 
 /* MARK: 设置窗口 —— 按钮 */
 

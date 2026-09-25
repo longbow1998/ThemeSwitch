@@ -53,10 +53,11 @@
 "settings.section.general" = "General";
 "settings.general.enable" = "Enable automatic switching";
 "settings.general.launch_at_login" = "Launch at login";
-"settings.general.launch_at_login_hint" = "Start ThemeSwitch automatically when you log in, so you do not have to open it by hand.";
-"settings.general.footer" = "While automatic switching is off, the app no longer changes the system appearance and only keeps the menu bar icon and the manual switch items. Launch at login is written to the system only after you click Save.";
+/* Footer copy is kept short on purpose: the settings window must stay short enough to fit
+   on small screens without scrolling. Keep the same amount of information, fewer words. */
+"settings.general.footer" = "With automatic switching off, the app keeps only the menu bar icon and the manual switch items. Launch at login is written to the system on Save.";
 "settings.general.language" = "Interface language";
-"settings.general.language_hint" = "Takes effect right away: the menu, the menu bar clock, alerts and this window all use the selected language. If something still shows the old one, reopen this window or restart the app.";
+"settings.general.language_hint" = "Applies right away; reopen this window if anything still shows the old language.";
 
 /* MARK: Interface language options */
 
@@ -71,28 +72,29 @@
 "settings.section.time_zone" = "Time Zone";
 "settings.time_zone.label" = "Time zone";
 "settings.time_zone.reference_label" = "Reference time zone";
-"settings.time_zone.footer" = "The time zone decides when the switch happens. The reference time zone is only used to show those switch times as the local time of the city you care about. Both pickers accept a choice from the list or any IANA identifier you type, for example Asia/Tokyo.";
+"settings.time_zone.footer" = "The time zone decides when the switch happens; the reference one only converts those times into the city you care about. Both accept a list choice or any IANA identifier, e.g. Asia/Tokyo.";
 
 /* MARK: Settings window — switch times */
 
 "settings.section.switch_times" = "Switch Times";
 "settings.switch_times.to_dark" = "Switch to dark";
 "settings.switch_times.to_light" = "Switch to light";
-"settings.switch_times.footer" = "The times are judged in the time zone selected above. If both times are equal, the appearance stays light all day and never switches.";
+"settings.switch_times.footer" = "Judged in the time zone above; if both times are equal, the appearance stays light all day.";
 
 /* MARK: Settings window — menu bar clock */
 
 "settings.section.clock" = "Menu Bar Clock";
 "settings.clock.show" = "Show clock";
 "settings.clock.time_zone_label" = "Clock time zone";
-"settings.clock.footer" = "When on, the date, weekday and time (24-hour) of the selected time zone are shown after the menu bar icon. This only affects the display and has nothing to do with automatic switching or how dark and light are decided.";
+"settings.clock.footer" = "When on, the selected time zone's date, weekday and 24-hour time appear after the menu bar icon. Display only — it never affects switching.";
 "settings.clock.preview" = "Preview:";
-"settings.clock.preview_off" = "Off";
+/* Shown right after the preview time while the clock itself is off, e.g. "Preview: Sep 25 Fri 11:50 (clock off)" */
+"settings.clock.preview_off" = "(clock off)";
 
 /* MARK: Settings window — about */
 
 "settings.section.about" = "About";
-"settings.about.body" = "ThemeSwitch changes the system appearance when the local time of the selected time zone reaches the two times above. The macOS system time zone does not affect it.";
+"settings.about.body" = "ThemeSwitch switches when the selected time zone's local time reaches the two times above; the macOS system time zone does not matter.";
 
 /* MARK: Settings window — buttons */
 
