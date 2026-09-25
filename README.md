@@ -17,6 +17,8 @@ ThemeSwitch 完全独立于系统时区工作：它用你自己选定的时区�
 - 可选**菜单栏时钟**：在图标后显示指定时区的「日期 + 星期 + 24 小时制时间」
 - 设置窗口带**时区换算提示**：把当前设定换算成参考时区的当地时间，一眼看懂对应关系
 - 菜单栏菜单显示当前状态与下次切换时间（同样按参考时区换算）
+- 可配置**登录自启**（优先用系统的 `SMAppService`，未签名场景自动回退到 LaunchAgent）
+- **单实例保护**：重复启动不会在菜单栏出现多个图标
 - 纯菜单栏（无 Dock 图标），无第三方依赖
 
 ## 系统要求
@@ -41,6 +43,19 @@ cd ThemeSwitch
 ./uninstall.sh            # 保留配置
 ./uninstall.sh --purge    # 同时清除配置
 ```
+
+### 从 Release 下载
+
+到 [Releases](https://github.com/longbow1998/ThemeSwitch/releases) 下载 `ThemeSwitch.zip`，解压后把 `ThemeSwitch.app` 拖进 `/Applications`。
+
+> **首次打开会被 Gatekeeper 拦下**——本项目使用 ad-hoc 签名（没有 Apple 开发者证书），
+> 下载后系统会提示"无法验证开发者"。解决办法是**右键点 App → 打开**，或执行：
+>
+> ```bash
+> xattr -dr com.apple.quarantine /Applications/ThemeSwitch.app
+> ```
+
+**注意**：Release 里的二进制目前是 **Apple Silicon（arm64）** 构建，Intel Mac 请从源码构建。
 
 ### 仅构建
 
