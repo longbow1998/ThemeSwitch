@@ -8,8 +8,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var clockTimer: Timer?
     private var settingsWindow: SettingsWindow?
     private var statusMenuItem: NSMenuItem?
+    private var overrideNoticeMenuItem: NSMenuItem?
     private var nextSwitchMenuItem: NSMenuItem?
     private var quickToggleMenuItem: NSMenuItem?
+    private var resumeAutomationMenuItem: NSMenuItem?
     private var observerTokens: [NSObjectProtocol] = []
     /// 最近一次生效的配置：供 1 秒时钟定时器使用，避免每秒读盘；随 refreshUI 更新
     private var currentConfig: ThemeConfig = .default
@@ -67,9 +69,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         menu.delegate = self
 
-        // 信息区：两条只读状态（置灰），与下面的操作区用分隔线分组
+        // 信息区：只读状态（置灰），与下面的操作区用分隔线分组。
+        // 「暂停说明行」只在手动覆盖生效时出现，平时隐藏，菜单保持原来的样子。
         let status = menu.addItem(withTitle: "", action: nil, keyEquivalent: "")
         status.isEnabled = false
+
+        let overrideNotice = menu.addItem(withTitle: "", action: nil, keyEquivalent: "")
+        overrideNotice.isEnabled = false
+        overrideNotice.isHidden = true
 
         let nextSwitch = menu.addItem(withTitle: "", action: nil, keyEquivalent: "")
         nextSwitch.isEnabled = false
@@ -80,6 +87,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             keyEquivalent: ""
         )
 
+        // 与「立即切换」同组，也只在覆盖生效时出现
+        let resume = menu.addItem(
+            withTitle: "恢复自动切换",
+            action: #selector(resumeAutomation(_:)),
+            keyEquivalent: ""
+        )
+        resume.isHidden = true
+
         menu.addItem(.separator())
         menu.addItem(withTitle: "设置…", action: #selector(openSettings(_:)), keyEquivalent: ",")
         menu.addItem(.separator())
@@ -89,25 +104,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         statusItem = item
         statusMenuItem = status
+        overrideNoticeMenuItem = overrideNotice
         nextSwitchMenuItem = nextSwitch
         quickToggleMenuItem = quick
+        resumeAutomationMenuItem = resume
     }
 
     /// 状态栏图标：优先 SF Symbol（模板图像，自动跟随菜单栏深浅色）；
     /// 取不到时退化成文字，保证状态栏始终有可读的状态指示且不会崩。
     /// 开启时钟时在图标后附加时钟文字（等宽数字字体，避免数字宽度抖动）。
-    private func setStatusIcon(dark: Bool, clockText: String?) {
+    private func setStatusIcon(dark: Bool, clockText: String?, paused: Bool) {
         guard let button = statusItem?.button else { return }
         if let clockText, !clockText.isEmpty {
             button.font = NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
         } else {
             button.font = nil
         }
-        if let image = NSImage(
-            systemSymbolName: dark ? "moon.fill" : "sun.max",
-            accessibilityDescription: dark ? "深色模式" : "浅色模式"
-        ) {
-            image.isTemplate = true
+        if let image = Self.statusBarIcon(dark: dark, paused: paused) {
             button.image = image
             button.title = clockText ?? ""
             button.imagePosition = clockText == nil ? .imageOnly : .imageLeft
@@ -116,6 +129,63 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let fallback = dark ? "深" : "浅"
             button.title = clockText.map { "\(fallback) \($0)" } ?? fallback
         }
+    }
+
+    /// 太阳 / 月亮的模板图标；`paused` 为真时在右下角叠一个暂停角标，
+    /// 让用户不点开菜单也能看出自动切换正被手动覆盖暂停。
+    /// 取不到 SF Symbol 时返回 nil，由 setStatusIcon 退化成原来的纯文字。
+    static func statusBarIcon(dark: Bool, paused: Bool) -> NSImage? {
+        let symbolName = dark ? "moon.fill" : "sun.max"
+        let description = dark ? "深色模式" : "浅色模式"
+        // 不给底图加 symbol configuration：尺寸与改动前完全一致（sun.max 16pt、moon.fill 15pt）
+        guard let base = NSImage(systemSymbolName: symbolName, accessibilityDescription: description) else {
+            return nil
+        }
+        base.isTemplate = true
+
+        guard paused,
+              let badge = NSImage(
+                  systemSymbolName: "pause.circle.fill",
+                  accessibilityDescription: "自动切换已暂停"
+              )?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .bold))
+        else {
+            return base
+        }
+        badge.isTemplate = true
+
+        let canvas = NSSize(width: 16, height: 16)
+        let badgeRect = NSRect(x: canvas.width - 8, y: 0, width: 8, height: 8)
+        func draw(_ image: NSImage, in rect: NSRect) {
+            let size = image.size
+            guard size.width > 0, size.height > 0 else { return }
+            // 等比缩放、居中，且只缩不放：底图保持原本大小，角标缩小后贴角
+            let scale = min(1, min(rect.width / size.width, rect.height / size.height))
+            let target = NSSize(width: size.width * scale, height: size.height * scale)
+            image.draw(
+                in: NSRect(
+                    x: rect.midX - target.width / 2,
+                    y: rect.midY - target.height / 2,
+                    width: target.width,
+                    height: target.height
+                )
+            )
+        }
+
+        let image = NSImage(size: canvas, flipped: false) { _ in
+            draw(base, in: NSRect(origin: .zero, size: canvas))
+            // 模板图只按 alpha 上色，底图和角标的实心圆叠在一起会糊成一团。
+            // 先把角标区域挖空（连同一条细缝），pause.circle.fill 里那两道竖杠保持透明，
+            // 暂停的形状才读得出来。
+            NSGraphicsContext.saveGraphicsState()
+            NSGraphicsContext.current?.compositingOperation = .clear
+            NSBezierPath(ovalIn: badgeRect.insetBy(dx: -0.75, dy: -0.75)).fill()
+            NSGraphicsContext.restoreGraphicsState()
+            draw(badge, in: badgeRect)
+            return true
+        }
+        image.isTemplate = true
+        image.accessibilityDescription = "\(description)（自动切换已暂停）"
+        return image
     }
 
     // MARK: - 定时切换
@@ -149,11 +219,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func applyScheduledAppearance() {
         let config = ThemeConfig.load()
 
-        if config.enabled {
-            let shouldBeDark = Schedule.shouldBeDark(config)
-            if shouldBeDark != AppearanceController.isDark {
-                AppearanceController.setDark(shouldBeDark)
-            }
+        // 手动覆盖窗口内 scheduledTarget 返回 nil，这里就什么都不做（用户的临时选择优先）；
+        // 窗口到点自动失效，下面这行重新按计划收敛 —— 这就是休眠 / 重启 / 改系统时钟的自愈来源。
+        if let target = ManualOverride.scheduledTarget(config),
+           target != AppearanceController.isDark {
+            AppearanceController.setDark(target)
         }
 
         refreshUI(config: config)
@@ -166,17 +236,50 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         let clockText: String? = config.showClock
             ? ThemeConfig.clockString(for: Date(), in: config.resolvedClockTimeZone)
             : nil
-        setStatusIcon(dark: isDark, clockText: clockText)
+        // 自动切换停用时无所谓「暂停」，覆盖状态只在启用时对外呈现
+        let overrideDeadline = config.enabled ? ManualOverride.deadline : nil
+        setStatusIcon(dark: isDark, clockText: clockText, paused: overrideDeadline != nil)
 
-        statusMenuItem?.title =
-            "当前：\(isDark ? "深色模式" : "浅色模式") · 自动切换已\(config.enabled ? "启用" : "停用")"
+        statusMenuItem?.title = Self.statusTitle(
+            isDark: isDark,
+            config: config,
+            overrideDeadline: overrideDeadline
+        )
+        if let overrideDeadline {
+            overrideNoticeMenuItem?.title = Self.overrideNoticeTitle(deadline: overrideDeadline, config: config)
+        }
+        overrideNoticeMenuItem?.isHidden = overrideDeadline == nil
         nextSwitchMenuItem?.title = Self.nextSwitchDescription(for: config)
 
         quickToggleMenuItem?.title = isDark ? "立即切换为浅色" : "立即切换为深色"
         quickToggleMenuItem?.isEnabled = true
+        resumeAutomationMenuItem?.isHidden = overrideDeadline == nil
     }
 
     // MARK: - 菜单文案
+
+    /// 首行状态：覆盖期间必须写明「暂停中」以及恢复时刻（参考时区的当地时间），
+    /// 其余情况保持原来的措辞。
+    static func statusTitle(isDark: Bool, config: ThemeConfig, overrideDeadline: Date?) -> String {
+        let appearance = isDark ? "深色模式" : "浅色模式"
+        guard let overrideDeadline else {
+            return "当前：\(appearance) · 自动切换已\(config.enabled ? "启用" : "停用")"
+        }
+        return "当前：\(appearance) · 自动切换已暂停（至 \(momentDescription(overrideDeadline, in: config)) 恢复）"
+    }
+
+    /// 说明行：让用户明白暂停是自己刚才手动切换造成的，以及到点会自动恢复、无需操作。
+    static func overrideNoticeTitle(deadline: Date, config: ThemeConfig) -> String {
+        "手动切换后临时暂停，到 \(momentDescription(deadline, in: config)) 会自动恢复按计划切换，无需手动操作"
+    }
+
+    /// 覆盖窗口的恢复时刻：与「下次切换」同一套参考时区口径，例如「明天 05:00」。
+    static func momentDescription(_ date: Date, in config: ThemeConfig) -> String {
+        let referenceZone = config.resolvedReferenceTimeZone
+        let day = dayDescription(for: date, in: referenceZone)
+        let dayPrefix = day.isEmpty ? "" : "\(day) "
+        return "\(dayPrefix)\(string(from: date, in: referenceZone))"
+    }
 
     /// 「下次切换」的自然语言描述：把配置时区的切换时刻换算成参考时区的当地时间，
     /// 用户看到的就是自己关心的那座城市的钟，例如「下次：明天 北京 19:00 转为深色」。
@@ -311,9 +414,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     // MARK: - 菜单动作
 
+    /// 「立即切换为深色 / 浅色」：照旧切换外观，同时把自动切换暂停到下一个计划切换时刻。
+    /// 这样手动选择立刻生效且不会被 8 秒后的收敛逻辑拉回去，而到点后调度照常接管。
     @objc private func quickToggleAppearance(_ sender: Any?) {
+        let config = ThemeConfig.load()
         AppearanceController.setDark(!AppearanceController.isDark)
-        refreshUI(config: ThemeConfig.load())
+        ManualOverride.activateForManualToggle(config)
+        refreshUI(config: config)
+    }
+
+    /// 「恢复自动切换」：清掉覆盖并立刻收敛回计划状态（不必等下一个切换时刻）。
+    @objc private func resumeAutomation(_ sender: Any?) {
+        ManualOverride.clear()
+        applyScheduledAppearance()
     }
 
     @objc private func openSettings(_ sender: Any?) {
