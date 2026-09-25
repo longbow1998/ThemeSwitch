@@ -55,6 +55,15 @@
 "settings.general.launch_at_login" = "登录时自动启动";
 "settings.general.launch_at_login_hint" = "让 ThemeSwitch 在登录时自动启动，无需手动打开。";
 "settings.general.footer" = "「启用自动切换」关闭后 App 不再改变系统外观，只保留菜单栏图标与「立即切换」；「登录时自动启动」在点「保存」后才写入系统。";
+"settings.general.language" = "界面语言";
+"settings.general.language_hint" = "切换后立即生效：菜单、菜单栏时钟、弹窗与设置窗口都用该语言。若个别界面未刷新，重新打开设置窗口或重启 App 即可。";
+
+/* MARK: 界面语言选项 */
+
+/* 「跟随系统」跟当前界面语言走；两个语言名用各自的母语写法，两套 .strings 里取值相同、不翻译 */
+"language.follow_system" = "跟随系统";
+"language.en" = "English";
+"language.zh_hans" = "简体中文";
 
 /* MARK: 设置窗口 —— 时区 */
 

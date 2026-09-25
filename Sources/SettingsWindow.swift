@@ -190,6 +190,14 @@ final class SettingsModel: ObservableObject {
     /// 登录自启。真实来源是系统登录项（LoginItem），不进 ThemeConfig：
     /// 它只在点「保存」时写回系统，点「取消」时靠 load(from:) 重新读系统状态回滚。
     @Published var launchAtLogin: Bool
+    /// 界面语言选择（编辑中的值）："system" / "en" / "zh-Hans"。与窗口里其它控件一致，
+    /// 点「保存」才写进配置，点「取消」由 load(from:) 回滚。
+    @Published var language: String
+    /// 当前实际生效的界面语言标识（来自已保存的配置）：设置窗口自己用它渲染。
+    /// 与 language 分开，是因为窗口里的 SwiftUI 文案要和菜单、弹窗同一语言 ——
+    /// 那些地方（NSLocalizedString / 时区短名表）走的是已保存的选择，
+    /// 若这里跟着编辑中的值走，会出现「窗口已经是新语言、菜单还是旧语言」的错位。
+    @Published var activeLanguage: String
     @Published var timeZoneID: String
     @Published var referenceTimeZoneID: String
     @Published var showClock: Bool
@@ -201,6 +209,8 @@ final class SettingsModel: ObservableObject {
         let config = ThemeConfig.default
         enabled = config.enabled
         launchAtLogin = LoginItem.isEnabled
+        language = config.language
+        activeLanguage = LanguageOverride.effectiveIdentifier
         timeZoneID = config.timeZoneID
         referenceTimeZoneID = config.referenceTimeZoneID
         showClock = config.showClock
@@ -213,6 +223,9 @@ final class SettingsModel: ObservableObject {
         enabled = config.enabled
         // 每次重新读系统真实状态，而不是沿用界面上的值
         launchAtLogin = LoginItem.isEnabled
+        language = LanguageOverride.normalized(config.language)
+        // 已保存的配置此刻已经生效（AppDelegate 每次刷新都会 apply），直接取当前生效值
+        activeLanguage = LanguageOverride.effectiveIdentifier
         timeZoneID = config.timeZoneID.isEmpty ? "system" : config.timeZoneID
         referenceTimeZoneID = config.referenceTimeZoneID.isEmpty ? "system" : config.referenceTimeZoneID
         showClock = config.showClock
@@ -235,7 +248,8 @@ final class SettingsModel: ObservableObject {
             lightMinute: Self.minute(of: lightTime),
             referenceTimeZoneID: referenceTimeZoneID,
             showClock: showClock,
-            clockTimeZoneID: clockTimeZoneID
+            clockTimeZoneID: clockTimeZoneID,
+            language: LanguageOverride.normalized(language)
         )
     }
 
@@ -312,6 +326,25 @@ private struct SettingsView: View {
                         Toggle("settings.general.enable", isOn: $model.enabled)
                         Toggle("settings.general.launch_at_login", isOn: $model.launchAtLogin)
                         Text("settings.general.launch_at_login_hint")
+                            .font(.callout)
+                            .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
+                        HStack(spacing: 12) {
+                            Text("settings.general.language")
+                                .fixedSize()
+                            Picker("settings.general.language", selection: $model.language) {
+                                // 语言名一律用各自的母语写法（English / 简体中文），两套 .strings 里取值相同、
+                                // 不随界面语言翻译 —— 这样不管界面当前是什么语言，用户都认得出自己的语言；
+                                // 只有「跟随系统」跟当前语言走。
+                                Text("language.follow_system").tag(LanguageOverride.systemValue)
+                                Text("language.en").tag(LanguageOverride.englishIdentifier)
+                                Text("language.zh_hans").tag(LanguageOverride.simplifiedChineseIdentifier)
+                            }
+                            .labelsHidden()
+                            .pickerStyle(.menu)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        Text("settings.general.language_hint")
                             .font(.callout)
                             .foregroundStyle(.secondary)
                             .fixedSize(horizontal: false, vertical: true)
@@ -419,6 +452,10 @@ private struct SettingsView: View {
             .padding(.horizontal, 20)
             .padding(.vertical, 14)
         }
+        // SwiftUI 侧的本地化语言：`Text("key")`（LocalizedStringKey）按它查表。
+        // 与 AppKit 侧 LanguageOverride 交换 bundle 查表取的是同一个语言，两边不会打架。
+        // 取的是已保存并生效的语言（activeLanguage），所以窗口里的文案与菜单、弹窗始终一致。
+        .environment(\.locale, AppLanguage.locale(for: model.activeLanguage))
         .frame(width: Layout.contentWidth)
     }
 
@@ -430,11 +467,12 @@ private struct SettingsView: View {
 
     /// 时间选择器用的 locale：语言跟随 App 当前语言，小时制固定 24 小时
     /// （与菜单栏时钟口径一致，英文下也不会出现 AM/PM）。
-    private static let timePickerLocale: Locale = {
-        var components = Locale.Components(identifier: Locale.current.identifier)
+    /// 按当前语言现算而不是用 static let：语言能在 App 内切换，常量会一直停在启动时的语言。
+    private static var timePickerLocale: Locale {
+        var components = Locale.Components(identifier: AppLanguage.locale.identifier)
         components.hourCycle = .zeroToTwentyThree
         return Locale(components: components)
-    }()
+    }
 
     @ViewBuilder
     private var hintView: some View {
@@ -594,6 +632,7 @@ private struct TimeZoneComboBox: NSViewRepresentable {
 
 final class SettingsWindow: NSObject, NSWindowDelegate {
     private var window: NSWindow?
+    private var hostingController: FittingHostingController<SettingsView>?
     private let model = SettingsModel()
 
     func show() {
@@ -601,6 +640,11 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             buildWindow()
         }
         model.load(from: ThemeConfig.load())
+        // 窗口标题、内容宽度都是 AppKit 侧的，不跟 SwiftUI 环境 locale 走：
+        // 界面语言可以在 App 内切换，所以每次打开都按当前语言重设一次，
+        // 否则切完语言再打开设置窗口，标题还停在旧语言、宽度也还是旧语言的。
+        window?.title = NSLocalizedString("settings.window.title", comment: "")
+        hostingController?.minContentWidth = Layout.contentWidth
         NSApp.activate(ignoringOtherApps: true)
         window?.makeKeyAndOrderFront(nil)
     }
@@ -619,6 +663,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         window.title = NSLocalizedString("settings.window.title", comment: "")
         window.delegate = self
         self.window = window
+        self.hostingController = hostingController
         window.center()
         hostingController.applyFittingSize()
     }
@@ -700,6 +745,9 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
             }
         }
         config.save()
+        // 语言立即生效：先 apply 一次，不依赖通知的时序；下面的通知会让 AppDelegate 重新刷新
+        // 菜单与菜单栏时钟（它每次刷新也会 apply）。设置窗口自身在下次打开时按新语言渲染。
+        LanguageOverride.apply(config.language)
         NotificationCenter.default.post(name: .themeConfigChanged, object: nil)
         window?.orderOut(nil)
     }

@@ -21,9 +21,9 @@ ThemeSwitch 完全独立于系统时区工作：它用你自己选定的时区�
   菜单里能看到暂停状态、也能一键恢复自动切换
 - 可配置**登录自启**（优先用系统的 `SMAppService`，未签名场景自动回退到 LaunchAgent）
 - **单实例保护**：重复启动不会在菜单栏出现多个图标
-- **界面中英双语**：系统语言是中文时显示简体中文，其余一律英文（默认语言 `en`）；
-  菜单、设置窗口、弹窗与错误提示都查同一套 `Localizable.strings`，
-  菜单栏时钟的日期格式、星期名与时区显示名也跟着界面语言走
+- **界面中英双语，且可在 App 内切换**：默认跟随系统语言（系统语言是中文时显示简体中文，其余一律英文，默认语言 `en`），
+  也可在设置里锁定为 `English` 或 `简体中文` —— 选定后无视系统语言，菜单、设置窗口、弹窗与错误提示都用该语言，
+  菜单栏时钟的日期格式、星期名与时区显示名也跟着走（两种语言都是 24 小时制）
 - 纯菜单栏（无 Dock 图标），无第三方依赖
 
 ## 系统要求
@@ -78,6 +78,7 @@ cd ThemeSwitch
    - **参考时区**：换算提示与菜单「下次切换」所参照的时区（建议设成你自己的真实时区）
    - **切换时间**：转暗 / 转亮两个时间点
    - **菜单栏时钟**（可选）：开启后菜单栏显示日期 / 星期 / 时间
+   - **界面语言**（可选）：跟随系统 / English / 简体中文；点「保存」后立即生效（菜单、菜单栏时钟、弹窗、设置窗口）
 
 ### 举个例子
 
@@ -99,6 +100,7 @@ cd ThemeSwitch
 Sources/
   main.swift                 程序入口
   Config.swift               配置模型与持久化（UserDefaults）、时钟文案格式化、当前界面语言
+  LanguageOverride.swift     界面语言的运行时覆盖（交换 bundle 查表 + 语言判定）
   Schedule.swift             时区感知的时段计算
   AppearanceController.swift 读写系统外观
   ManualOverride.swift       手动切换的覆盖窗口（暂停自动切换的状态）
@@ -121,6 +123,12 @@ install.sh / uninstall.sh    安装与卸载
   ```
   首次使用可能需要在「系统设置 → 隐私与安全性 → 自动化」里允许本 App 控制 System Events
 - **配置存储**：`~/Library/Preferences/com.themeswitch.app.plist`（UserDefaults）
+- **界面语言**：默认跟随系统（`CFBundleLocalizations` 只声明了 `en` / `zh-Hans`，因此繁体中文等其它系统语言都走英文）。
+  在设置里选定具体语言后，运行时会交换 `Bundle.main` 的 `localizedString(forKey:value:table:)`，
+  改从对应的 `<lang>.lproj` 子 bundle 取文案（`NSLocalizedString` 一侧，覆盖菜单、弹窗、窗口标题等），
+  并给设置窗口的 SwiftUI 视图挂上对应的环境 `locale`（`Text("key")` 一侧）；
+  语言判定集中在 `AppLanguage`，时钟日期格式、星期名与时区显示名都跟着它走。
+  选「跟随系统」或取不到 `.lproj` 时完全走系统原本的查表路径
 - **无网络访问**，所有逻辑本地完成
 
 ### 手动切换与自动切换的关系
@@ -147,6 +155,8 @@ install.sh / uninstall.sh    安装与卸载
 
 - 切换依赖 `osascript`，因此需要「自动化」权限；未授权时切换会静默失败（菜单里的「立即切换」同样受影响）
 - 时段精度为轮询间隔（约 8 秒），切换时刻可能有数秒误差
+- 切换界面语言后菜单、菜单栏时钟、弹窗与设置窗口都立即用新语言；但**已经显示出来的** AppKit 对象
+  （例如正开着的警告框）不会中途换语言，重新打开或重启 App 即可
 - 时区显示名分语言：中文界面用内置的常用时区中文名映射表（少见时区取系统给出的中文名），
   英文界面直接用 IANA 标识符最后一段（`America/Los_Angeles` → `Los Angeles`）；
   两者都保留兜底，认不出的标识符原样显示、不崩
@@ -166,7 +176,7 @@ Unlike the built-in "Auto" appearance — which follows sunrise/sunset of your *
 
 Features: configurable timezone and switch times, optional menu bar clock, timezone conversion hints in the settings window, no third-party dependencies.
 
-The interface is bilingual (English / Simplified Chinese). English is the default language (`CFBundleDevelopmentRegion`), so every system language other than Chinese gets the English UI; the clock format, weekday names and time zone names follow the app language as well. Product strings live in `Resources/en.lproj/Localizable.strings` and `Resources/zh-Hans.lproj/Localizable.strings` and are loaded through the standard bundle lookup.
+The interface is bilingual (English / Simplified Chinese). It follows the system language by default (English is the default language, `CFBundleDevelopmentRegion`), so every system language other than Chinese gets the English UI — and it can also be pinned in-app to `English` or `简体中文` from the settings window, which then overrides the system language for the menu, the clock, alerts and the settings window itself. The clock format, weekday names and time zone names follow the same app language (24-hour in both languages). Product strings live in `Resources/en.lproj/Localizable.strings` and `Resources/zh-Hans.lproj/Localizable.strings`; the in-app choice is applied at runtime by exchanging `Bundle.main`'s localized lookup and by setting the SwiftUI environment locale.
 
 Manually toggling the appearance from the menu pauses the automatic schedule until the next planned switch time (the menu shows the pause state and offers a one-click resume). The schedule itself stays convergent, so sleeping, rebooting, or changing the system clock still self-heals.
 

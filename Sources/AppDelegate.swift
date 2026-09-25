@@ -12,6 +12,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     private var nextSwitchMenuItem: NSMenuItem?
     private var quickToggleMenuItem: NSMenuItem?
     private var resumeAutomationMenuItem: NSMenuItem?
+    /// 「设置…」「退出」两项的文案在启动时一次性建好，界面语言改变后要重设标题（见 refreshStaticMenuTitles）
+    private var settingsMenuItem: NSMenuItem?
+    private var quitMenuItem: NSMenuItem?
     private var observerTokens: [NSObjectProtocol] = []
     /// 最近一次生效的配置：供 1 秒时钟定时器使用，避免每秒读盘；随 refreshUI 更新
     private var currentConfig: ThemeConfig = .default
@@ -19,6 +22,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     // MARK: - NSApplicationDelegate
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // 界面语言必须在建菜单之前定下来：菜单项的文案是这里一次性查表建好的。
+        LanguageOverride.apply(ThemeConfig.load().language)
         buildStatusItem()
 
         observerTokens.append(
@@ -96,13 +101,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         resume.isHidden = true
 
         menu.addItem(.separator())
-        menu.addItem(
+        let settings = menu.addItem(
             withTitle: NSLocalizedString("menu.settings", comment: ""),
             action: #selector(openSettings(_:)),
             keyEquivalent: ","
         )
         menu.addItem(.separator())
-        menu.addItem(
+        let quit = menu.addItem(
             withTitle: NSLocalizedString("menu.quit", comment: ""),
             action: #selector(quit(_:)),
             keyEquivalent: "q"
@@ -116,6 +121,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         nextSwitchMenuItem = nextSwitch
         quickToggleMenuItem = quick
         resumeAutomationMenuItem = resume
+        settingsMenuItem = settings
+        quitMenuItem = quit
     }
 
     /// 状态栏图标：优先 SF Symbol（模板图像，自动跟随菜单栏深浅色）；
@@ -242,6 +249,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private func refreshUI(config: ThemeConfig) {
         currentConfig = config
+        // 界面语言可能在设置里刚被改过：先把语言落到 LanguageOverride（并交换 bundle 的查表实现），
+        // 下面这些 NSLocalizedString 才会按新语言取文案 —— 菜单、图标描述、时钟都在这里刷新。
+        LanguageOverride.apply(config.language)
         let isDark = AppearanceController.isDark
         // 时钟只受 showClock 控制，与 enabled（自动切换）无关
         let clockText: String? = config.showClock
@@ -268,6 +278,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         )
         quickToggleMenuItem?.isEnabled = true
         resumeAutomationMenuItem?.isHidden = overrideDeadline == nil
+        refreshStaticMenuTitles()
+    }
+
+    /// 菜单里那几项「固定文案」在启动时一次性建好，之后不再随状态变化。
+    /// 界面语言可以在 App 内切换，而菜单不会整体重建，所以每次刷新都按当前语言重设它们的标题 ——
+    /// 否则切完语言后「设置…」「退出」还停在旧语言。
+    private func refreshStaticMenuTitles() {
+        resumeAutomationMenuItem?.title = NSLocalizedString("menu.resume", comment: "")
+        settingsMenuItem?.title = NSLocalizedString("menu.settings", comment: "")
+        quitMenuItem?.title = NSLocalizedString("menu.quit", comment: "")
     }
 
     // MARK: - 菜单文案
@@ -366,7 +386,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // 兜底日期也跟界面语言走：中文「9月25日」、英文「Sep 25」
         let formatter = DateFormatter()
-        formatter.locale = Locale.current
+        formatter.locale = AppLanguage.locale
         formatter.timeZone = timeZone
         formatter.dateFormat = NSLocalizedString("date.month_day_format", comment: "")
         return formatter.string(from: date)

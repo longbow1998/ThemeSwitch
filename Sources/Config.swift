@@ -19,6 +19,9 @@ struct ThemeConfig: Codable, Equatable {
     var showClock: Bool
     /// 菜单栏时钟显示的时区："system" 跟随系统，否则为 IANA 标识。只影响展示。
     var clockTimeZoneID: String
+    /// 界面语言："system" 跟随系统语言，否则为 "en" / "zh-Hans"。
+    /// 只影响界面文案与语言相关的格式化（时钟日期、星期名、时区显示名），不影响切换逻辑。
+    var language: String
 
     init(
         enabled: Bool,
@@ -29,7 +32,8 @@ struct ThemeConfig: Codable, Equatable {
         lightMinute: Int,
         referenceTimeZoneID: String = "system",
         showClock: Bool = false,
-        clockTimeZoneID: String = "system"
+        clockTimeZoneID: String = "system",
+        language: String = "system"
     ) {
         self.enabled = enabled
         self.timeZoneID = timeZoneID
@@ -40,6 +44,7 @@ struct ThemeConfig: Codable, Equatable {
         self.referenceTimeZoneID = referenceTimeZoneID
         self.showClock = showClock
         self.clockTimeZoneID = clockTimeZoneID
+        self.language = language
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -52,10 +57,11 @@ struct ThemeConfig: Codable, Equatable {
         case referenceTimeZoneID
         case showClock
         case clockTimeZoneID
+        case language
     }
 
     /// 为兼容旧版本持久化的配置：JSON 里没有 referenceTimeZoneID / showClock /
-    /// clockTimeZoneID 键时分别取 "system" / false / "system"，其余字段照常解码，
+    /// clockTimeZoneID / language 键时分别取 "system" / false / "system" / "system"，其余字段照常解码，
     /// 避免 load() 因缺字段解码失败而回退 .default、丢掉用户已有设置。
     /// 定义了自定义 init(from:) 后成员初始化器被抑制，上面的显式 init 保持调用点不变。
     init(from decoder: Decoder) throws {
@@ -69,6 +75,11 @@ struct ThemeConfig: Codable, Equatable {
         referenceTimeZoneID = try container.decodeIfPresent(String.self, forKey: .referenceTimeZoneID) ?? "system"
         showClock = try container.decodeIfPresent(Bool.self, forKey: .showClock) ?? false
         clockTimeZoneID = try container.decodeIfPresent(String.self, forKey: .clockTimeZoneID) ?? "system"
+        // 旧配置没有这个键 → "system"；认不出的值（比如手工改成 "fr"）也一并规范化成 "system"，
+        // 免得非法值一路带到界面与查表逻辑里。
+        language = LanguageOverride.normalized(
+            try container.decodeIfPresent(String.self, forKey: .language) ?? "system"
+        )
     }
 
     static let `default`: ThemeConfig = ThemeConfig(
@@ -149,13 +160,14 @@ struct ThemeConfig: Codable, Equatable {
 
     /// 菜单栏时钟文本：中文「9月25日 周五 21:45」、英文「Sep 25 Fri 21:45」。
     /// 格式模式串存在 Localizable.strings 里（key: clock.date_format），两种语言各取各的；
-    /// locale 用 Locale.current —— 在 App bundle 里它会跟随当前生效的界面语言，
-    /// 星期名与月份名随之本地化。模式串固定用 HH，显式模式串不受 locale 的 12 小时偏好影响，
+    /// locale 用 AppLanguage.locale —— 跟的是 App 当前生效的界面语言（用户可显式指定），
+    /// 而不是 Locale.current（那跟的是系统语言），星期名与月份名随之本地化。
+    /// 模式串固定用 HH，显式模式串不受 locale 的 12 小时偏好影响，
     /// 因此两种语言都是 24 小时制、不会出现 AM/PM。
     /// 设置窗口预览与菜单栏共用，保证两处显示一致。
     static func clockString(for date: Date, in timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale.current
+        formatter.locale = AppLanguage.locale
         formatter.timeZone = timeZone
         formatter.dateFormat = NSLocalizedString(
             "clock.date_format",
@@ -173,16 +185,30 @@ struct ThemeConfig: Codable, Equatable {
             && !timeZoneID.isEmpty
             && !referenceTimeZoneID.isEmpty
             && !clockTimeZoneID.isEmpty
+            && !language.isEmpty
     }
 }
 
 // MARK: - 界面语言
 
-/// App 当前生效的界面语言：由 bundle 里的本地化资源（en.lproj / zh-Hans.lproj）决定，
-/// 跟随系统「语言与地区」以及按 App 指定的语言。只有中文走 zh-Hans，其余一律英文。
+/// App 当前生效的界面语言：优先用户在设置里显式选择的语言（见 LanguageOverride），
+/// 没选（"system"）时才看 bundle 的本地化结果 —— 系统语言是中文走 zh-Hans，其余一律英文。
+/// 所有依赖语言的地方（菜单文案、时区显示名、时钟日期格式、时区短名表……）都从这里取，
+/// 不要各判断各的，否则 App 内切了语言会出现一半中文一半英文。
 enum AppLanguage {
+    /// 当前生效的语言标识："en" / "zh-Hans"
+    static var identifier: String { LanguageOverride.effectiveIdentifier }
+
     /// 只有中文界面才用中文专用的显示逻辑（时区中文城市名表）；英文界面走中性写法。
-    static var isChinese: Bool {
-        (Bundle.main.preferredLocalizations.first ?? "en").hasPrefix("zh")
+    static var isChinese: Bool { identifier.hasPrefix("zh") }
+
+    /// 语言相关的格式化（时钟日期模式、星期名、月份名）统一用它。
+    /// 不能用 Locale.current：它跟的是系统语言与地区，不跟 App 内的语言选择。
+    static var locale: Locale { locale(for: identifier) }
+
+    /// 指定语言标识对应的 locale。设置窗口按模型里的当前语言取值，
+    /// 这样语言变化能触发 SwiftUI 重新渲染（直接读 AppLanguage.locale 不会）。
+    static func locale(for identifier: String) -> Locale {
+        Locale(identifier: identifier)
     }
 }
