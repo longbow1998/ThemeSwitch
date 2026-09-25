@@ -465,9 +465,7 @@ private struct TimeZoneComboBox: NSViewRepresentable {
 
     private static let followSystemItem = "跟随系统"
 
-    func makeCoordinator() -> Coordinator {
-        Coordinator(selection: $selection)
-    }
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
 
     func makeNSView(context: Context) -> NSComboBox {
         let comboBox = NSComboBox()
@@ -482,6 +480,11 @@ private struct TimeZoneComboBox: NSViewRepresentable {
     }
 
     func updateNSView(_ comboBox: NSComboBox, context: Context) {
+        // 每次都刷新 coordinator 持有的最新绑定，否则它会一直写回旧的值。
+        context.coordinator.parent = self
+        // 只在用户没有正在编辑时才同步显示值：
+        // 编辑中强行改写 stringValue 会把用户刚选中的内容弹回旧值（这正是之前保存不上的原因）。
+        guard comboBox.currentEditor() == nil else { return }
         let displayText = Self.displayText(for: selection)
         if comboBox.stringValue != displayText {
             comboBox.stringValue = displayText
@@ -492,28 +495,29 @@ private struct TimeZoneComboBox: NSViewRepresentable {
         identifier == "system" ? followSystemItem : identifier
     }
 
+    /// 把控件里的文本规范成配置里存的标识："跟随系统" → "system"，其余去掉首尾空白
+    fileprivate static func normalized(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed == followSystemItem ? "system" : trimmed
+    }
+
     final class Coordinator: NSObject, NSComboBoxDelegate {
-        private var selection: Binding<String>
+        var parent: TimeZoneComboBox
 
-        init(selection: Binding<String>) {
-            self.selection = selection
+        init(_ parent: TimeZoneComboBox) {
+            self.parent = parent
         }
 
+        /// 从下拉列表选中一项，或按下回车
         @objc func comboBoxAction(_ sender: NSComboBox) {
-            apply(text: sender.stringValue)
+            parent.selection = TimeZoneComboBox.normalized(sender.stringValue)
         }
 
-        @objc func controlTextDidChange(_ notification: Notification) {
+        /// 手输自定义标识后离开输入框时提交。
+        /// 这里刻意不用 controlTextDidChange —— 那会在每敲一个字符时就把半截文本写进配置。
+        @objc func controlTextDidEndEditing(_ notification: Notification) {
             guard let comboBox = notification.object as? NSComboBox else { return }
-            apply(text: comboBox.stringValue)
-        }
-
-        private func apply(text: String) {
-            if text == TimeZoneComboBox.followSystemItem {
-                selection.wrappedValue = "system"
-            } else {
-                selection.wrappedValue = text
-            }
+            parent.selection = TimeZoneComboBox.normalized(comboBox.stringValue)
         }
     }
 }

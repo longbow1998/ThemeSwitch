@@ -39,6 +39,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         startPollingTimer()
         startClockTimer()
         applyScheduledAppearance()
+
+        // 调试入口：设了 THEMESWITCH_OPEN_SETTINGS=1 时启动即打开设置窗口。
+        // 菜单栏图标（LSUIElement 的状态项）无法通过 AX 触发，自动化测试只能靠这个开关。
+        if ProcessInfo.processInfo.environment["THEMESWITCH_OPEN_SETTINGS"] == "1" {
+            openSettings(nil)
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
