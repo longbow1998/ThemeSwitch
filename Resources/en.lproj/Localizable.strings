@@ -1,0 +1,135 @@
+/*
+   ThemeSwitch — English (the default language, see CFBundleDevelopmentRegion).
+   Keys are semantic and must stay in sync with zh-Hans.lproj/Localizable.strings.
+   Placeholders (%@, %d) must appear in the same order in both languages.
+   Keep "HH" in every time format: the clock is 24-hour on purpose.
+*/
+
+/* MARK: Menu bar menu */
+
+/* Current appearance + auto switch state, e.g. "Now: Dark Mode · Auto switching: Enabled" */
+"menu.status.current" = "Now: %@ · Auto switching: %@";
+"menu.autoswitch.enabled" = "Enabled";
+"menu.autoswitch.disabled" = "Disabled";
+/* Paused by a manual switch, e.g. "Now: Dark Mode · Auto switching paused (resumes at Tomorrow 07:00)" */
+"menu.status.paused" = "Now: %@ · Auto switching paused (resumes at %@)";
+"menu.override.notice" = "Paused temporarily after a manual switch. Scheduled switching resumes automatically at %@, no action needed.";
+/* Auto switching is disabled / both times are equal — nothing is scheduled */
+"menu.next.disabled" = "Auto switching is off, so nothing is switched on schedule";
+"menu.next.same_time" = "Dark and light times are the same, so no switching happens";
+/* e.g. "Next: Tomorrow Beijing 19:00 → Dark Mode" */
+"menu.next.format" = "Next: %@%@ %@ → %@";
+/* Target of the next switch (the last placeholder of menu.next.format) */
+"menu.next.target.dark" = "Dark Mode";
+"menu.next.target.light" = "Light Mode";
+"menu.day.tomorrow" = "Tomorrow";
+"menu.resume" = "Resume Auto Switching";
+"menu.settings" = "Settings…";
+"menu.quit" = "Quit ThemeSwitch";
+"menu.quick.toDark" = "Switch to Dark Mode";
+"menu.quick.toLight" = "Switch to Light Mode";
+
+/* MARK: Appearance */
+
+"appearance.dark" = "Dark Mode";
+"appearance.light" = "Light Mode";
+/* Menu bar fallback text, only used when the SF Symbol is unavailable */
+"status.icon.dark" = "Dark";
+"status.icon.light" = "Light";
+/* Accessibility descriptions of the menu bar icon */
+"a11y.auto_switch.paused" = "Auto switching paused";
+"a11y.status.paused_format" = "%@ (auto switching paused)";
+
+/* MARK: Date formats (24-hour) */
+
+/* Menu bar clock: date, weekday, time */
+"clock.date_format" = "MMM d EEE HH:mm";
+/* Fallback date for a switch time that is neither today nor tomorrow */
+"date.month_day_format" = "MMM d";
+
+/* MARK: Settings window — general */
+
+"settings.window.title" = "ThemeSwitch Settings";
+"settings.section.general" = "General";
+"settings.general.enable" = "Enable automatic switching";
+"settings.general.launch_at_login" = "Launch at login";
+"settings.general.launch_at_login_hint" = "Start ThemeSwitch automatically when you log in, so you do not have to open it by hand.";
+"settings.general.footer" = "While automatic switching is off, the app no longer changes the system appearance and only keeps the menu bar icon and the manual switch items. Launch at login is written to the system only after you click Save.";
+
+/* MARK: Settings window — time zone */
+
+"settings.section.time_zone" = "Time Zone";
+"settings.time_zone.label" = "Time zone";
+"settings.time_zone.reference_label" = "Reference time zone";
+"settings.time_zone.footer" = "The time zone decides when the switch happens. The reference time zone is only used to show those switch times as the local time of the city you care about. Both pickers accept a choice from the list or any IANA identifier you type, for example Asia/Tokyo.";
+
+/* MARK: Settings window — switch times */
+
+"settings.section.switch_times" = "Switch Times";
+"settings.switch_times.to_dark" = "Switch to dark";
+"settings.switch_times.to_light" = "Switch to light";
+"settings.switch_times.footer" = "The times are judged in the time zone selected above. If both times are equal, the appearance stays light all day and never switches.";
+
+/* MARK: Settings window — menu bar clock */
+
+"settings.section.clock" = "Menu Bar Clock";
+"settings.clock.show" = "Show clock";
+"settings.clock.time_zone_label" = "Clock time zone";
+"settings.clock.footer" = "When on, the date, weekday and time (24-hour) of the selected time zone are shown after the menu bar icon. This only affects the display and has nothing to do with automatic switching or how dark and light are decided.";
+"settings.clock.preview" = "Preview:";
+"settings.clock.preview_off" = "Off";
+
+/* MARK: Settings window — about */
+
+"settings.section.about" = "About";
+"settings.about.body" = "ThemeSwitch changes the system appearance when the local time of the selected time zone reaches the two times above. The macOS system time zone does not affect it.";
+
+/* MARK: Settings window — buttons */
+
+"settings.button.reset" = "Reset to Defaults";
+"settings.button.cancel" = "Cancel";
+"settings.button.save" = "Save";
+
+/* MARK: Settings window — time zone hint */
+
+"settings.hint.empty" = "Enter or choose a time zone, for example Asia/Shanghai.";
+"settings.hint.invalid_zone" = "Unrecognized time zone identifier — please fix it before saving";
+"settings.hint.invalid_reference_zone" = "Unrecognized reference time zone identifier — please fix it before saving";
+"settings.hint.same_zone" = "The reference time zone is the same as the selected one (%@), so no conversion is needed.";
+"settings.hint.local_now" = "%@ local time is now %@";
+"settings.hint.next_day" = "(next day)";
+"settings.hint.previous_day" = "(previous day)";
+/* Actions shown in the conversion line, e.g. "Beijing 19:00 turns dark = Los Angeles 04:00" */
+"action.darken" = "turns dark";
+"action.lighten" = "turns light";
+
+/* MARK: Time zone combo box */
+
+/* Shown in the picker; maps to the stored sentinel value "system" */
+"zone.follow_system" = "Follow System";
+
+/* MARK: Alerts */
+
+"alert.ok" = "OK";
+"alert.timezone.invalid.title" = "Invalid time zone identifier";
+"alert.reference_timezone.invalid.title" = "Invalid reference time zone identifier";
+"alert.clock_timezone.invalid.title" = "Invalid clock time zone identifier";
+"alert.timezone.invalid.message" = "“%@” is not a valid IANA time zone identifier.\n\nExamples: Asia/Shanghai, America/Los_Angeles, Europe/London. To follow the system time zone, choose “%@”.";
+"alert.time.invalid.title" = "Invalid time";
+"alert.time.invalid.message" = "Hours must be between 0 and 23, and minutes between 0 and 59.";
+"alert.login_item.failed.title" = "Could not set launch at login";
+
+/* MARK: Login item errors (shown as the body of the launch at login alert) */
+
+"loginitem.error.requires_approval" = "The ThemeSwitch login item is turned off in System Settings › General › Login Items & Extensions. Please allow it again there.";
+"loginitem.error.executable_not_found" = "Could not find the ThemeSwitch executable, so launch at login cannot be set.";
+"loginitem.error.launch_agent_write_failed" = "Could not write the login item file %@: %@";
+"loginitem.error.launch_agent_load_failed" = "The login item file %@ was written, but registering it with launchd failed:\n%@";
+"loginitem.error.registration_failed" = "Registering the login item failed.";
+"loginitem.error.service_interface" = "System login item API: %@";
+"loginitem.error.launch_agent" = "LaunchAgent: %@";
+"loginitem.error.registration_advice" = "You can try again later, or add ThemeSwitch manually in System Settings › General › Login Items & Extensions.";
+"loginitem.error.unregistration_failed" = "Could not turn off launch at login: %@";
+"loginitem.error.service_unregister_failed" = "Unregistering the system login item failed: %@";
+"loginitem.error.remove_file_failed" = "Could not remove %@: %@";
+"loginitem.error.still_enabled" = "The login item is still active: %@";

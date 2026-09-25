@@ -22,23 +22,40 @@ enum LoginItemError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .requiresApproval:
-            return "ThemeSwitch 的登录项已在「系统设置 › 通用 › 登录项与扩展」中被关闭。请在那里重新允许它。"
+            return NSLocalizedString("loginitem.error.requires_approval", comment: "")
         case .executableNotFound:
-            return "找不到 ThemeSwitch 的可执行文件，无法设置登录自启。"
+            return NSLocalizedString("loginitem.error.executable_not_found", comment: "")
         case .launchAgentWriteFailed(let path, let reason):
-            return "无法写入登录项文件 \(path)：\(reason)"
+            return String(
+                format: NSLocalizedString("loginitem.error.launch_agent_write_failed", comment: ""),
+                path,
+                reason
+            )
         case .launchAgentLoadFailed(let path, let attempts):
-            return "已写入登录项文件 \(path)，但注册到 launchd 失败：\n" + attempts.joined(separator: "\n")
+            return String(
+                format: NSLocalizedString("loginitem.error.launch_agent_load_failed", comment: ""),
+                path,
+                attempts.joined(separator: "\n")
+            )
         case .registrationFailed(let serviceError, let launchAgentError):
-            var lines = ["注册登录项失败。"]
+            var lines = [NSLocalizedString("loginitem.error.registration_failed", comment: "")]
             if let serviceError {
-                lines.append("系统登录项接口：\(serviceError)")
+                lines.append(String(
+                    format: NSLocalizedString("loginitem.error.service_interface", comment: ""),
+                    serviceError
+                ))
             }
-            lines.append("LaunchAgent：\(launchAgentError)")
-            lines.append("可稍后重试，或在「系统设置 › 通用 › 登录项与扩展」里手动添加 ThemeSwitch。")
+            lines.append(String(
+                format: NSLocalizedString("loginitem.error.launch_agent", comment: ""),
+                launchAgentError
+            ))
+            lines.append(NSLocalizedString("loginitem.error.registration_advice", comment: ""))
             return lines.joined(separator: "\n")
         case .unregistrationFailed(let reason):
-            return "取消登录自启失败：\(reason)"
+            return String(
+                format: NSLocalizedString("loginitem.error.unregistration_failed", comment: ""),
+                reason
+            )
         }
     }
 }
@@ -229,7 +246,10 @@ final class LoginItemManager {
             do {
                 try service.unregister()
             } catch {
-                failures.append("系统登录项注销失败：\(error.localizedDescription)")
+                failures.append(String(
+                    format: NSLocalizedString("loginitem.error.service_unregister_failed", comment: ""),
+                    error.localizedDescription
+                ))
             }
         }
 
@@ -242,13 +262,20 @@ final class LoginItemManager {
             do {
                 try FileManager.default.removeItem(at: plistURL)
             } catch {
-                failures.append("无法删除 \(plistURL.path)：\(error.localizedDescription)")
+                failures.append(String(
+                    format: NSLocalizedString("loginitem.error.remove_file_failed", comment: ""),
+                    plistURL.path,
+                    error.localizedDescription
+                ))
             }
         }
 
         // 复查真实状态：还有残留才算失败
         if isEnabled || hasLaunchAgent {
-            failures.append("登录项仍然有效：\(plistURL.path)")
+            failures.append(String(
+                format: NSLocalizedString("loginitem.error.still_enabled", comment: ""),
+                plistURL.path
+            ))
         }
         guard failures.isEmpty else {
             throw LoginItemError.unregistrationFailed(reason: failures.joined(separator: "\n"))

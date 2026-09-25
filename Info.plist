@@ -2,8 +2,15 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
+    <!-- 默认语言：系统语言不在下面的本地化列表里时一律走英文 -->
     <key>CFBundleDevelopmentRegion</key>
     <string>en</string>
+    <!-- 支持的界面语言：只有简体中文走 zh-Hans，其余全部走 en -->
+    <key>CFBundleLocalizations</key>
+    <array>
+        <string>en</string>
+        <string>zh-Hans</string>
+    </array>
     <key>CFBundleDisplayName</key>
     <string>ThemeSwitch</string>
     <key>CFBundleExecutable</key>

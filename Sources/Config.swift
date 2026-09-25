@@ -147,13 +147,20 @@ struct ThemeConfig: Codable, Equatable {
         return "\(timeZone.identifier) (UTC\(sign)\(offsetText))"
     }
 
-    /// 菜单栏时钟文本：「M月d日 周X HH:mm」，用时钟时区的当地时间格式化，
-    /// 例如「9月25日 周五 21:45」。设置窗口预览与菜单栏共用，保证两处显示一致。
+    /// 菜单栏时钟文本：中文「9月25日 周五 21:45」、英文「Sep 25 Fri 21:45」。
+    /// 格式模式串存在 Localizable.strings 里（key: clock.date_format），两种语言各取各的；
+    /// locale 用 Locale.current —— 在 App bundle 里它会跟随当前生效的界面语言，
+    /// 星期名与月份名随之本地化。模式串固定用 HH，显式模式串不受 locale 的 12 小时偏好影响，
+    /// 因此两种语言都是 24 小时制、不会出现 AM/PM。
+    /// 设置窗口预览与菜单栏共用，保证两处显示一致。
     static func clockString(for date: Date, in timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
-        formatter.locale = Locale(identifier: "zh_Hans_CN")
+        formatter.locale = Locale.current
         formatter.timeZone = timeZone
-        formatter.dateFormat = "M月d日 EEE HH:mm"
+        formatter.dateFormat = NSLocalizedString(
+            "clock.date_format",
+            comment: "Menu bar clock date format; keep the 24-hour \"HH\" pattern"
+        )
         return formatter.string(from: date)
     }
 
@@ -166,5 +173,16 @@ struct ThemeConfig: Codable, Equatable {
             && !timeZoneID.isEmpty
             && !referenceTimeZoneID.isEmpty
             && !clockTimeZoneID.isEmpty
+    }
+}
+
+// MARK: - 界面语言
+
+/// App 当前生效的界面语言：由 bundle 里的本地化资源（en.lproj / zh-Hans.lproj）决定，
+/// 跟随系统「语言与地区」以及按 App 指定的语言。只有中文走 zh-Hans，其余一律英文。
+enum AppLanguage {
+    /// 只有中文界面才用中文专用的显示逻辑（时区中文城市名表）；英文界面走中性写法。
+    static var isChinese: Bool {
+        (Bundle.main.preferredLocalizations.first ?? "en").hasPrefix("zh")
     }
 }

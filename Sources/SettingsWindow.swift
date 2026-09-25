@@ -1,8 +1,10 @@
 import Cocoa
 import SwiftUI
 
-// MARK: - 时区中文名
+// MARK: - 时区短名
 
+/// 常见时区的中文城市名；只在中文界面使用（英文界面直接用 IANA 标识符最后一段，
+/// 见 timeZoneShortName），表里没有的时区也走那里的兜底逻辑。
 private let commonTimeZoneNames: [String: String] = [
     "UTC": "UTC",
     "Africa/Cairo": "开罗",
@@ -41,22 +43,27 @@ private let commonTimeZoneNames: [String: String] = [
     "Pacific/Auckland": "奥克兰"
 ]
 
+/// 时区短名。中文界面沿用上面的中文城市名表，表里没有时再取系统给出的中文名；
+/// 英文界面不直译那张表 —— 直接用 IANA 标识符最后一段并把下划线换成空格
+/// （America/Los_Angeles → Los Angeles），比意译更准确，也不会出现半中半英。
+/// 两种语言都保留原有兜底：认不出的标识符原样返回，不崩。
 private func timeZoneShortName(_ identifier: String) -> String {
-    if let name = commonTimeZoneNames[identifier] {
-        return name
-    }
     let resolved = identifier == "system" ? TimeZone.current.identifier : identifier
-    if let name = commonTimeZoneNames[resolved] {
-        return name
-    }
-    guard let timeZone = TimeZone(identifier: resolved) else {
-        return resolved
-    }
-    let locale = Locale(identifier: "zh_CN")
-    for style in [TimeZone.NameStyle.shortGeneric, .generic] {
-        if let name = timeZone.localizedName(for: style, locale: locale), !name.isEmpty {
-            return name.hasSuffix("时间") ? String(name.dropLast(2)) : name
+    if AppLanguage.isChinese {
+        if let name = commonTimeZoneNames[identifier] ?? commonTimeZoneNames[resolved] {
+            return name
         }
+        if let timeZone = TimeZone(identifier: resolved) {
+            let locale = Locale(identifier: "zh_CN")
+            for style in [TimeZone.NameStyle.shortGeneric, .generic] {
+                if let name = timeZone.localizedName(for: style, locale: locale), !name.isEmpty {
+                    return name.hasSuffix("时间") ? String(name.dropLast(2)) : name
+                }
+            }
+        }
+    }
+    guard TimeZone(identifier: resolved) != nil else {
+        return resolved
     }
     return (resolved as NSString).lastPathComponent.replacingOccurrences(of: "_", with: " ")
 }
@@ -64,11 +71,13 @@ private func timeZoneShortName(_ identifier: String) -> String {
 // MARK: - 时间与换算
 
 private enum Layout {
-    /// 窗口内容宽度固定，高度由 SwiftUI 内容（NSHostingController.fittingSize）决定，
-    /// 不再用固定高度把内容裁进滚动条。
-    static let contentWidth: CGFloat = 520
+    /// 窗口内容宽度按语言取值：英文标签更长，520 下输入框和开关文字会被挤得偏窄，560 更舒服。
+    /// 高度仍由 SwiftUI 内容（NSHostingController.fittingSize）决定，不放滚动条、不裁切。
+    static var contentWidth: CGFloat { AppLanguage.isChinese ? 520 : 560 }
 }
 
+/// 换算提示里的「钟点」：纯数字，固定 24 小时制。
+/// 固定用 en_US_POSIX 是为了不受界面语言影响 —— 两种语言下输出完全一致，也不会变成 12 小时制。
 private func wallClockString(_ date: Date, in timeZone: TimeZone) -> String {
     let formatter = DateFormatter()
     formatter.locale = Locale(identifier: "en_US_POSIX")
@@ -158,8 +167,18 @@ private func makeZoneHint(timeZoneID: String, referenceTimeZoneID: String, darkT
     return .converted(
         zoneName: timeZoneShortName(timeZone.identifier),
         referenceName: timeZoneShortName(referenceZone.identifier),
-        dark: conversion(for: darkTime, in: timeZone, referenceTimeZone: referenceZone, action: "转暗"),
-        light: conversion(for: lightTime, in: timeZone, referenceTimeZone: referenceZone, action: "转亮"),
+        dark: conversion(
+            for: darkTime,
+            in: timeZone,
+            referenceTimeZone: referenceZone,
+            action: NSLocalizedString("action.darken", comment: "")
+        ),
+        light: conversion(
+            for: lightTime,
+            in: timeZone,
+            referenceTimeZone: referenceZone,
+            action: NSLocalizedString("action.lighten", comment: "")
+        ),
         localNow: wallClockString(Date(), in: timeZone)
     )
 }
@@ -253,7 +272,8 @@ private struct ConversionLine: View {
                 .monospacedDigit()
             Text(conversion.action)
                 .foregroundStyle(.secondary)
-            Text("=")
+            // 「=」是语言中立的符号，不走本地化查表
+            Text(verbatim: "=")
                 .foregroundStyle(.secondary)
                 .padding(.horizontal, 4)
             Text(referenceName)
@@ -262,14 +282,17 @@ private struct ConversionLine: View {
                 .fontWeight(.medium)
                 .monospacedDigit()
             if conversion.dayOffset > 0 {
-                Text("（次日）")
+                Text("settings.hint.next_day")
                     .foregroundStyle(.secondary)
             } else if conversion.dayOffset < 0 {
-                Text("（前一天）")
+                Text("settings.hint.previous_day")
                     .foregroundStyle(.secondary)
             }
         }
         .font(.callout)
+        // 英文换算行更长：窄行下宁可略微缩字，也不要截断成「…」
+        .lineLimit(1)
+        .minimumScaleFactor(0.85)
     }
 }
 
@@ -286,28 +309,32 @@ private struct SettingsView: View {
             Form {
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
-                        Toggle("启用自动切换", isOn: $model.enabled)
-                        Toggle("登录时自动启动", isOn: $model.launchAtLogin)
-                        Text("让 ThemeSwitch 在登录时自动启动，无需手动打开。")
+                        Toggle("settings.general.enable", isOn: $model.enabled)
+                        Toggle("settings.general.launch_at_login", isOn: $model.launchAtLogin)
+                        Text("settings.general.launch_at_login_hint")
                             .font(.callout)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     }
                     .padding(.vertical, 2)
                 } header: {
-                    Text("通用")
+                    Text("settings.section.general")
                 } footer: {
-                    Text("「启用自动切换」关闭后 App 不再改变系统外观，只保留菜单栏图标与「立即切换」；「登录时自动启动」在点「保存」后才写入系统。")
+                    Text("settings.general.footer")
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                 Section {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack(spacing: 12) {
-                            Text("时区")
+                            Text("settings.time_zone.label")
+                                .fixedSize()
                             TimeZoneComboBox(selection: $model.timeZoneID)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         HStack(spacing: 12) {
-                            Text("参考时区")
+                            Text("settings.time_zone.reference_label")
+                                .fixedSize()
                             TimeZoneComboBox(selection: $model.referenceTimeZoneID)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
@@ -315,34 +342,45 @@ private struct SettingsView: View {
                     }
                     .padding(.vertical, 2)
                 } header: {
-                    Text("时区")
+                    Text("settings.section.time_zone")
                 } footer: {
-                    Text("「时区」决定切换时刻；「参考时区」只用来把切换时刻换算成你关心的城市时间。两个选择器都可从列表选择，也可直接输入任意 IANA 时区标识（例如 Asia/Tokyo）。")
+                    Text("settings.time_zone.footer")
+                        .fixedSize(horizontal: false, vertical: true)
                 }
 
                     Section {
                         Grid(alignment: .leading, verticalSpacing: 14) {
                             GridRow {
-                                Text("进入深色")
-                                timePicker(label: "进入深色", time: $model.darkTime)
+                                Text("settings.switch_times.to_dark")
+                                    .fixedSize()
+                                timePicker(
+                                    label: NSLocalizedString("settings.switch_times.to_dark", comment: ""),
+                                    time: $model.darkTime
+                                )
                             }
                             GridRow {
-                                Text("回到浅色")
-                                timePicker(label: "回到浅色", time: $model.lightTime)
+                                Text("settings.switch_times.to_light")
+                                    .fixedSize()
+                                timePicker(
+                                    label: NSLocalizedString("settings.switch_times.to_light", comment: ""),
+                                    time: $model.lightTime
+                                )
                             }
                         }
                         .padding(.vertical, 4)
                     } header: {
-                        Text("切换时间")
+                        Text("settings.section.switch_times")
                     } footer: {
-                        Text("按上面所选的时区判断到点切换；两个时间点相同则全天保持浅色、不发生切换。")
+                        Text("settings.switch_times.footer")
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Section {
                         VStack(alignment: .leading, spacing: 12) {
-                            Toggle("显示时钟", isOn: $model.showClock)
+                            Toggle("settings.clock.show", isOn: $model.showClock)
                             HStack(spacing: 12) {
-                                Text("时钟时区")
+                                Text("settings.clock.time_zone_label")
+                                    .fixedSize()
                                 TimeZoneComboBox(selection: $model.clockTimeZoneID)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .disabled(!model.showClock)
@@ -351,17 +389,19 @@ private struct SettingsView: View {
                         }
                         .padding(.vertical, 2)
                     } header: {
-                        Text("菜单栏时钟")
+                        Text("settings.section.clock")
                     } footer: {
-                        Text("开启后，菜单栏图标后会显示所选时区的「日期 星期 时间」（24 小时制）。只影响展示，与「启用自动切换」和深浅色判断无关。")
+                        Text("settings.clock.footer")
+                            .fixedSize(horizontal: false, vertical: true)
                     }
 
                     Section {
-                        Text("App 会在所选时区的当地时间到达上面两个时间点时切换系统深浅色，完全不受 macOS 系统时区影响。")
+                        Text("settings.about.body")
                             .font(.callout)
                             .foregroundStyle(.secondary)
+                            .fixedSize(horizontal: false, vertical: true)
                     } header: {
-                        Text("说明")
+                        Text("settings.section.about")
                     }
                 }
                 .formStyle(.grouped)
@@ -369,11 +409,11 @@ private struct SettingsView: View {
             Divider()
 
             HStack(spacing: 12) {
-                Button("恢复默认", action: onReset)
+                Button("settings.button.reset", action: onReset)
                 Spacer()
-                Button("取消", action: onCancel)
+                Button("settings.button.cancel", action: onCancel)
                     .keyboardShortcut(.cancelAction)
-                Button("保存", action: onSave)
+                Button("settings.button.save", action: onSave)
                     .keyboardShortcut(.defaultAction)
             }
             .padding(.horizontal, 20)
@@ -385,8 +425,16 @@ private struct SettingsView: View {
     private func timePicker(label: String, time: Binding<Date>) -> some View {
         DatePicker(label, selection: time, displayedComponents: [.hourAndMinute])
             .labelsHidden()
-            .environment(\.locale, Locale(identifier: "zh_Hans_CN"))
+            .environment(\.locale, Self.timePickerLocale)
     }
+
+    /// 时间选择器用的 locale：语言跟随 App 当前语言，小时制固定 24 小时
+    /// （与菜单栏时钟口径一致，英文下也不会出现 AM/PM）。
+    private static let timePickerLocale: Locale = {
+        var components = Locale.Components(identifier: Locale.current.identifier)
+        components.hourCycle = .zeroToTwentyThree
+        return Locale(components: components)
+    }()
 
     @ViewBuilder
     private var hintView: some View {
@@ -397,28 +445,40 @@ private struct SettingsView: View {
             lightTime: model.lightTime
         ) {
         case .empty:
-            Text("请输入或选择时区，例如 Asia/Shanghai。")
+            Text("settings.hint.empty")
                 .font(.callout)
                 .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
         case .invalidTimeZone:
-            Label("无法识别该时区标识，保存前请更正", systemImage: "exclamationmark.triangle.fill")
+            Label("settings.hint.invalid_zone", systemImage: "exclamationmark.triangle.fill")
                 .font(.callout)
                 .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
         case .invalidReferenceTimeZone:
-            Label("无法识别参考时区标识，保存前请更正", systemImage: "exclamationmark.triangle.fill")
+            Label("settings.hint.invalid_reference_zone", systemImage: "exclamationmark.triangle.fill")
                 .font(.callout)
                 .foregroundStyle(.red)
+                .fixedSize(horizontal: false, vertical: true)
         case .sameAsReference(let zoneName):
-            Text("参考时区与所设时区相同（\(zoneName)），无需换算。")
-                .font(.callout)
-                .foregroundStyle(.secondary)
+            Text(String(
+                format: NSLocalizedString("settings.hint.same_zone", comment: ""),
+                zoneName
+            ))
+            .font(.callout)
+            .foregroundStyle(.secondary)
+            .fixedSize(horizontal: false, vertical: true)
         case .converted(let zoneName, let referenceName, let dark, let light, let localNow):
             VStack(alignment: .leading, spacing: 6) {
                 ConversionLine(zoneName: zoneName, conversion: dark, referenceName: referenceName)
                 ConversionLine(zoneName: zoneName, conversion: light, referenceName: referenceName)
-                Text("\(zoneName)当地时间现在 \(localNow)")
-                    .font(.callout)
-                    .foregroundStyle(.secondary)
+                Text(String(
+                    format: NSLocalizedString("settings.hint.local_now", comment: ""),
+                    zoneName,
+                    localNow
+                ))
+                .font(.callout)
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
             }
         }
     }
@@ -433,15 +493,17 @@ private struct ClockPreviewLine: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Text("预览：")
+            Text("settings.clock.preview")
                 .foregroundStyle(.secondary)
+                .fixedSize()
             if showClock {
                 TimelineView(.periodic(from: .now, by: 1)) { context in
                     Text(ThemeConfig.clockString(for: context.date, in: previewTimeZone))
                         .monospacedDigit()
+                        .fixedSize()
                 }
             } else {
-                Text("已关闭")
+                Text("settings.clock.preview_off")
                     .foregroundStyle(.tertiary)
             }
         }
@@ -463,7 +525,12 @@ private struct ClockPreviewLine: View {
 private struct TimeZoneComboBox: NSViewRepresentable {
     @Binding var selection: String
 
-    private static let followSystemItem = "跟随系统"
+    /// 下拉框第一项「跟随系统」的本地化显示文案。它只是显示值，配置里存的仍是哨兵值 "system"；
+    /// 显示、规范化、以及非法标识弹窗里的提示共用这一个来源，
+    /// 否则切到英文后选 "Follow System" 会被当成非法时区标识。
+    fileprivate static var followSystemItem: String {
+        NSLocalizedString("zone.follow_system", comment: "")
+    }
 
     func makeCoordinator() -> Coordinator { Coordinator(self) }
 
@@ -495,7 +562,8 @@ private struct TimeZoneComboBox: NSViewRepresentable {
         identifier == "system" ? followSystemItem : identifier
     }
 
-    /// 把控件里的文本规范成配置里存的标识："跟随系统" → "system"，其余去掉首尾空白
+    /// 把控件里的文本规范成配置里存的标识：本地化后的「跟随系统」（英文 "Follow System"）→ "system"，
+    /// 其余去掉首尾空白。比较的是本地化后的显示文案本身，不再写死中文。
     fileprivate static func normalized(_ text: String) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed == followSystemItem ? "system" : trimmed
@@ -548,7 +616,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         hostingController.minContentWidth = Layout.contentWidth
         let window = NSWindow(contentViewController: hostingController)
         window.styleMask = [.titled, .closable]
-        window.title = "ThemeSwitch 设置"
+        window.title = NSLocalizedString("settings.window.title", comment: "")
         window.delegate = self
         self.window = window
         window.center()
@@ -564,12 +632,22 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         window?.orderOut(nil)
     }
 
+    /// 非法时区标识的统一提示文案：参数是用户输入（或下拉框里）的原始文本，
+    /// 「跟随系统」按当前界面语言显示，不再是写死的中文。
+    private func invalidTimeZoneMessage(_ identifier: String) -> String {
+        String(
+            format: NSLocalizedString("alert.timezone.invalid.message", comment: ""),
+            identifier,
+            TimeZoneComboBox.followSystemItem
+        )
+    }
+
     private func saveChanges() {
         let identifier = model.timeZoneID.trimmingCharacters(in: .whitespacesAndNewlines)
         if identifier != "system", TimeZone(identifier: identifier) == nil {
             presentAlert(
-                title: "时区标识无效",
-                message: "“\(identifier)” 不是有效的 IANA 时区标识。\n\n示例：Asia/Shanghai、America/Los_Angeles、Europe/London；跟随系统时区请选择「跟随系统」。"
+                title: NSLocalizedString("alert.timezone.invalid.title", comment: ""),
+                message: invalidTimeZoneMessage(identifier)
             )
             return
         }
@@ -577,8 +655,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let normalizedReference = referenceIdentifier.isEmpty ? "system" : referenceIdentifier
         if normalizedReference != "system", TimeZone(identifier: normalizedReference) == nil {
             presentAlert(
-                title: "参考时区标识无效",
-                message: "“\(referenceIdentifier)” 不是有效的 IANA 时区标识。\n\n示例：Asia/Shanghai、America/Los_Angeles、Europe/London；跟随系统时区请选择「跟随系统」。"
+                title: NSLocalizedString("alert.reference_timezone.invalid.title", comment: ""),
+                message: invalidTimeZoneMessage(referenceIdentifier)
             )
             return
         }
@@ -586,8 +664,8 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         let normalizedClock = clockIdentifier.isEmpty ? "system" : clockIdentifier
         if normalizedClock != "system", TimeZone(identifier: normalizedClock) == nil {
             presentAlert(
-                title: "时钟时区标识无效",
-                message: "“\(clockIdentifier)” 不是有效的 IANA 时区标识。\n\n示例：Asia/Shanghai、America/Los_Angeles、Europe/London；跟随系统时区请选择「跟随系统」。"
+                title: NSLocalizedString("alert.clock_timezone.invalid.title", comment: ""),
+                message: invalidTimeZoneMessage(clockIdentifier)
             )
             return
         }
@@ -599,7 +677,10 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         if !(0...23).contains(config.darkHour) || !(0...59).contains(config.darkMinute)
             || !(0...23).contains(config.lightHour) || !(0...59).contains(config.lightMinute)
         {
-            presentAlert(title: "时间无效", message: "小时需在 0–23 之间，分钟需在 0–59 之间。")
+            presentAlert(
+                title: NSLocalizedString("alert.time.invalid.title", comment: ""),
+                message: NSLocalizedString("alert.time.invalid.message", comment: "")
+            )
             return
         }
         // 登录自启只在点「保存」时才写回系统；只在开关与系统实际状态不一致时才动手，
@@ -612,7 +693,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
                 // 不让界面显示的状态和系统真正的状态对不上。
                 model.launchAtLogin = LoginItem.isEnabled
                 presentAlert(
-                    title: "无法设置登录时自动启动",
+                    title: NSLocalizedString("alert.login_item.failed.title", comment: ""),
                     message: error.localizedDescription
                 )
                 return
@@ -631,7 +712,7 @@ final class SettingsWindow: NSObject, NSWindowDelegate {
         alert.messageText = title
         alert.informativeText = message
         alert.alertStyle = .warning
-        alert.addButton(withTitle: "好")
+        alert.addButton(withTitle: NSLocalizedString("alert.ok", comment: ""))
         alert.beginSheetModal(for: window) { _ in }
     }
 

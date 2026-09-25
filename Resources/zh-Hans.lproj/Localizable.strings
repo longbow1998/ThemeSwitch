@@ -1,0 +1,135 @@
+/*
+   ThemeSwitch — 简体中文。
+   key 与 en.lproj/Localizable.strings 必须完全一致（语义化 key，不要用中文原文当 key）。
+   占位符（%@、%d）在两种语言里必须保持同样的出现顺序。
+   时间格式一律保留 "HH"：菜单栏时钟固定 24 小时制。
+*/
+
+/* MARK: 菜单栏菜单 */
+
+/* 首行状态，例如「当前：深色模式 · 自动切换已启用」 */
+"menu.status.current" = "当前：%@ · 自动切换已%@";
+"menu.autoswitch.enabled" = "启用";
+"menu.autoswitch.disabled" = "停用";
+/* 手动覆盖期间的首行状态，例如「当前：深色模式 · 自动切换已暂停（至 明天 07:00 恢复）」 */
+"menu.status.paused" = "当前：%@ · 自动切换已暂停（至 %@ 恢复）";
+"menu.override.notice" = "手动切换后临时暂停，到 %@ 会自动恢复按计划切换，无需手动操作";
+/* 自动切换停用 / 两个时间点相同：都没有「下次切换」可言 */
+"menu.next.disabled" = "自动切换已停用，不会定时切换";
+"menu.next.same_time" = "深浅色时间相同，不会自动切换";
+/* 例如「下次：明天 北京 19:00 转为深色」 */
+"menu.next.format" = "下次：%@%@ %@ 转为%@";
+/* 下次切换的目标（menu.next.format 的最后一个占位符） */
+"menu.next.target.dark" = "深色";
+"menu.next.target.light" = "浅色";
+"menu.day.tomorrow" = "明天";
+"menu.resume" = "恢复自动切换";
+"menu.settings" = "设置…";
+"menu.quit" = "退出 ThemeSwitch";
+"menu.quick.toDark" = "立即切换为深色";
+"menu.quick.toLight" = "立即切换为浅色";
+
+/* MARK: 外观 */
+
+"appearance.dark" = "深色模式";
+"appearance.light" = "浅色模式";
+/* 菜单栏纯文字兜底（取不到 SF Symbol 时才会出现） */
+"status.icon.dark" = "深";
+"status.icon.light" = "浅";
+/* 菜单栏图标的辅助功能描述 */
+"a11y.auto_switch.paused" = "自动切换已暂停";
+"a11y.status.paused_format" = "%@（自动切换已暂停）";
+
+/* MARK: 日期格式（24 小时制） */
+
+/* 菜单栏时钟：日期 + 星期 + 时间 */
+"clock.date_format" = "M月d日 EEE HH:mm";
+/* 切换时刻既不是今天也不是明天时的兜底日期 */
+"date.month_day_format" = "M月d日";
+
+/* MARK: 设置窗口 —— 通用 */
+
+"settings.window.title" = "ThemeSwitch 设置";
+"settings.section.general" = "通用";
+"settings.general.enable" = "启用自动切换";
+"settings.general.launch_at_login" = "登录时自动启动";
+"settings.general.launch_at_login_hint" = "让 ThemeSwitch 在登录时自动启动，无需手动打开。";
+"settings.general.footer" = "「启用自动切换」关闭后 App 不再改变系统外观，只保留菜单栏图标与「立即切换」；「登录时自动启动」在点「保存」后才写入系统。";
+
+/* MARK: 设置窗口 —— 时区 */
+
+"settings.section.time_zone" = "时区";
+"settings.time_zone.label" = "时区";
+"settings.time_zone.reference_label" = "参考时区";
+"settings.time_zone.footer" = "「时区」决定切换时刻；「参考时区」只用来把切换时刻换算成你关心的城市时间。两个选择器都可从列表选择，也可直接输入任意 IANA 时区标识（例如 Asia/Tokyo）。";
+
+/* MARK: 设置窗口 —— 切换时间 */
+
+"settings.section.switch_times" = "切换时间";
+"settings.switch_times.to_dark" = "进入深色";
+"settings.switch_times.to_light" = "回到浅色";
+"settings.switch_times.footer" = "按上面所选的时区判断到点切换；两个时间点相同则全天保持浅色、不发生切换。";
+
+/* MARK: 设置窗口 —— 菜单栏时钟 */
+
+"settings.section.clock" = "菜单栏时钟";
+"settings.clock.show" = "显示时钟";
+"settings.clock.time_zone_label" = "时钟时区";
+"settings.clock.footer" = "开启后，菜单栏图标后会显示所选时区的「日期 星期 时间」（24 小时制）。只影响展示，与「启用自动切换」和深浅色判断无关。";
+"settings.clock.preview" = "预览：";
+"settings.clock.preview_off" = "已关闭";
+
+/* MARK: 设置窗口 —— 说明 */
+
+"settings.section.about" = "说明";
+"settings.about.body" = "App 会在所选时区的当地时间到达上面两个时间点时切换系统深浅色，完全不受 macOS 系统时区影响。";
+
+/* MARK: 设置窗口 —— 按钮 */
+
+"settings.button.reset" = "恢复默认";
+"settings.button.cancel" = "取消";
+"settings.button.save" = "保存";
+
+/* MARK: 设置窗口 —— 时区提示 */
+
+"settings.hint.empty" = "请输入或选择时区，例如 Asia/Shanghai。";
+"settings.hint.invalid_zone" = "无法识别该时区标识，保存前请更正";
+"settings.hint.invalid_reference_zone" = "无法识别参考时区标识，保存前请更正";
+"settings.hint.same_zone" = "参考时区与所设时区相同（%@），无需换算。";
+"settings.hint.local_now" = "%@当地时间现在 %@";
+"settings.hint.next_day" = "（次日）";
+"settings.hint.previous_day" = "（前一天）";
+/* 换算行里的动作，例如「北京 19:00 转暗 = 洛杉矶 04:00」 */
+"action.darken" = "转暗";
+"action.lighten" = "转亮";
+
+/* MARK: 时区选择框 */
+
+/* 下拉框里的显示文案；选中它映射为配置里的哨兵值 "system" */
+"zone.follow_system" = "跟随系统";
+
+/* MARK: 弹窗 */
+
+"alert.ok" = "好";
+"alert.timezone.invalid.title" = "时区标识无效";
+"alert.reference_timezone.invalid.title" = "参考时区标识无效";
+"alert.clock_timezone.invalid.title" = "时钟时区标识无效";
+"alert.timezone.invalid.message" = "“%@” 不是有效的 IANA 时区标识。\n\n示例：Asia/Shanghai、America/Los_Angeles、Europe/London；跟随系统时区请选择「%@」。";
+"alert.time.invalid.title" = "时间无效";
+"alert.time.invalid.message" = "小时需在 0–23 之间，分钟需在 0–59 之间。";
+"alert.login_item.failed.title" = "无法设置登录时自动启动";
+
+/* MARK: 登录项错误（作为上面那个弹窗的正文展示） */
+
+"loginitem.error.requires_approval" = "ThemeSwitch 的登录项已在「系统设置 › 通用 › 登录项与扩展」中被关闭。请在那里重新允许它。";
+"loginitem.error.executable_not_found" = "找不到 ThemeSwitch 的可执行文件，无法设置登录自启。";
+"loginitem.error.launch_agent_write_failed" = "无法写入登录项文件 %@：%@";
+"loginitem.error.launch_agent_load_failed" = "已写入登录项文件 %@，但注册到 launchd 失败：\n%@";
+"loginitem.error.registration_failed" = "注册登录项失败。";
+"loginitem.error.service_interface" = "系统登录项接口：%@";
+"loginitem.error.launch_agent" = "LaunchAgent：%@";
+"loginitem.error.registration_advice" = "可稍后重试，或在「系统设置 › 通用 › 登录项与扩展」里手动添加 ThemeSwitch。";
+"loginitem.error.unregistration_failed" = "取消登录自启失败：%@";
+"loginitem.error.service_unregister_failed" = "系统登录项注销失败：%@";
+"loginitem.error.remove_file_failed" = "无法删除 %@：%@";
+"loginitem.error.still_enabled" = "登录项仍然有效：%@";

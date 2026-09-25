@@ -89,16 +89,24 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // 与「立即切换」同组，也只在覆盖生效时出现
         let resume = menu.addItem(
-            withTitle: "恢复自动切换",
+            withTitle: NSLocalizedString("menu.resume", comment: ""),
             action: #selector(resumeAutomation(_:)),
             keyEquivalent: ""
         )
         resume.isHidden = true
 
         menu.addItem(.separator())
-        menu.addItem(withTitle: "设置…", action: #selector(openSettings(_:)), keyEquivalent: ",")
+        menu.addItem(
+            withTitle: NSLocalizedString("menu.settings", comment: ""),
+            action: #selector(openSettings(_:)),
+            keyEquivalent: ","
+        )
         menu.addItem(.separator())
-        menu.addItem(withTitle: "退出 ThemeSwitch", action: #selector(quit(_:)), keyEquivalent: "q")
+        menu.addItem(
+            withTitle: NSLocalizedString("menu.quit", comment: ""),
+            action: #selector(quit(_:)),
+            keyEquivalent: "q"
+        )
 
         item.menu = menu
 
@@ -126,7 +134,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             button.imagePosition = clockText == nil ? .imageOnly : .imageLeft
         } else {
             button.image = nil
-            let fallback = dark ? "深" : "浅"
+            let fallback = NSLocalizedString(dark ? "status.icon.dark" : "status.icon.light", comment: "")
             button.title = clockText.map { "\(fallback) \($0)" } ?? fallback
         }
     }
@@ -136,7 +144,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 取不到 SF Symbol 时返回 nil，由 setStatusIcon 退化成原来的纯文字。
     static func statusBarIcon(dark: Bool, paused: Bool) -> NSImage? {
         let symbolName = dark ? "moon.fill" : "sun.max"
-        let description = dark ? "深色模式" : "浅色模式"
+        let description = NSLocalizedString(dark ? "appearance.dark" : "appearance.light", comment: "")
         // 不给底图加 symbol configuration：尺寸与改动前完全一致（sun.max 16pt、moon.fill 15pt）
         guard let base = NSImage(systemSymbolName: symbolName, accessibilityDescription: description) else {
             return nil
@@ -146,7 +154,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         guard paused,
               let badge = NSImage(
                   systemSymbolName: "pause.circle.fill",
-                  accessibilityDescription: "自动切换已暂停"
+                  accessibilityDescription: NSLocalizedString("a11y.auto_switch.paused", comment: "")
               )?.withSymbolConfiguration(NSImage.SymbolConfiguration(pointSize: 9, weight: .bold))
         else {
             return base
@@ -184,7 +192,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             return true
         }
         image.isTemplate = true
-        image.accessibilityDescription = "\(description)（自动切换已暂停）"
+        image.accessibilityDescription = String(
+            format: NSLocalizedString("a11y.status.paused_format", comment: ""),
+            description
+        )
         return image
     }
 
@@ -251,7 +262,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         overrideNoticeMenuItem?.isHidden = overrideDeadline == nil
         nextSwitchMenuItem?.title = Self.nextSwitchDescription(for: config)
 
-        quickToggleMenuItem?.title = isDark ? "立即切换为浅色" : "立即切换为深色"
+        quickToggleMenuItem?.title = NSLocalizedString(
+            isDark ? "menu.quick.toLight" : "menu.quick.toDark",
+            comment: ""
+        )
         quickToggleMenuItem?.isEnabled = true
         resumeAutomationMenuItem?.isHidden = overrideDeadline == nil
     }
@@ -261,16 +275,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     /// 首行状态：覆盖期间必须写明「暂停中」以及恢复时刻（参考时区的当地时间），
     /// 其余情况保持原来的措辞。
     static func statusTitle(isDark: Bool, config: ThemeConfig, overrideDeadline: Date?) -> String {
-        let appearance = isDark ? "深色模式" : "浅色模式"
+        let appearance = NSLocalizedString(isDark ? "appearance.dark" : "appearance.light", comment: "")
         guard let overrideDeadline else {
-            return "当前：\(appearance) · 自动切换已\(config.enabled ? "启用" : "停用")"
+            let state = NSLocalizedString(
+                config.enabled ? "menu.autoswitch.enabled" : "menu.autoswitch.disabled",
+                comment: ""
+            )
+            return String(
+                format: NSLocalizedString("menu.status.current", comment: ""),
+                appearance,
+                state
+            )
         }
-        return "当前：\(appearance) · 自动切换已暂停（至 \(momentDescription(overrideDeadline, in: config)) 恢复）"
+        return String(
+            format: NSLocalizedString("menu.status.paused", comment: ""),
+            appearance,
+            momentDescription(overrideDeadline, in: config)
+        )
     }
 
     /// 说明行：让用户明白暂停是自己刚才手动切换造成的，以及到点会自动恢复、无需操作。
     static func overrideNoticeTitle(deadline: Date, config: ThemeConfig) -> String {
-        "手动切换后临时暂停，到 \(momentDescription(deadline, in: config)) 会自动恢复按计划切换，无需手动操作"
+        String(
+            format: NSLocalizedString("menu.override.notice", comment: ""),
+            momentDescription(deadline, in: config)
+        )
     }
 
     /// 覆盖窗口的恢复时刻：与「下次切换」同一套参考时区口径，例如「明天 05:00」。
@@ -282,24 +311,37 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     /// 「下次切换」的自然语言描述：把配置时区的切换时刻换算成参考时区的当地时间，
-    /// 用户看到的就是自己关心的那座城市的钟，例如「下次：明天 北京 19:00 转为深色」。
+    /// 用户看到的就是自己关心的那座城市的钟，例如「下次：明天 北京 19:00 转为深色」
+    /// / "Next: Tomorrow Beijing 19:00 → Dark Mode"。
     /// 参考时区默认跟随系统（referenceTimeZoneID == "system"），用户可指定其他时区。
     private static func nextSwitchDescription(for config: ThemeConfig) -> String {
         guard config.enabled else {
-            return "自动切换已停用，不会定时切换"
+            return NSLocalizedString("menu.next.disabled", comment: "")
         }
         guard let next = Schedule.nextSwitch(config) else {
-            return "深浅色时间相同，不会自动切换"
+            return NSLocalizedString("menu.next.same_time", comment: "")
         }
         let referenceZone = config.resolvedReferenceTimeZone
         let day = dayDescription(for: next.date, in: referenceZone)
         let dayPrefix = day.isEmpty ? "" : "\(day) "
-        return "下次：\(dayPrefix)\(shortTimeZoneName(referenceZone)) "
-            + "\(string(from: next.date, in: referenceZone)) 转为\(next.toDark ? "深色" : "浅色")"
+        let target = NSLocalizedString(
+            next.toDark ? "menu.next.target.dark" : "menu.next.target.light",
+            comment: ""
+        )
+        return String(
+            format: NSLocalizedString("menu.next.format", comment: ""),
+            dayPrefix,
+            shortTimeZoneName(referenceZone),
+            string(from: next.date, in: referenceZone),
+            target
+        )
     }
 
+    /// 换算提示与菜单里的钟点：纯数字，固定 24 小时制。
+    /// 用 en_US_POSIX 是为了不受界面语言影响 —— 两种语言下输出完全一致，也不会变成 12 小时制。
     private static func string(from date: Date, in timeZone: TimeZone) -> String {
         let formatter = DateFormatter()
+        formatter.locale = Locale(identifier: "en_US_POSIX")
         formatter.timeZone = timeZone
         formatter.dateFormat = "HH:mm"
         return formatter.string(from: date)
@@ -320,17 +362,18 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         if let tomorrow = calendar.date(byAdding: .day, value: 1, to: now),
            calendar.isDate(date, inSameDayAs: tomorrow)
         {
-            return "明天"
+            return NSLocalizedString("menu.day.tomorrow", comment: "")
         }
+        // 兜底日期也跟界面语言走：中文「9月25日」、英文「Sep 25」
         let formatter = DateFormatter()
+        formatter.locale = Locale.current
         formatter.timeZone = timeZone
-        formatter.locale = Locale(identifier: "zh_Hans_CN")
-        formatter.dateFormat = "M月d日"
+        formatter.dateFormat = NSLocalizedString("date.month_day_format", comment: "")
         return formatter.string(from: date)
     }
 
-    /// 常见时区的中文城市名；表里没有时退回 IANA 标识符最后一段
-    /// （如 Asia/Kathmandu → Kathmandu）。
+    /// 常见时区的中文城市名；只在中文界面使用（英文界面直接用 IANA 标识符最后一段，
+    /// 见 shortTimeZoneName），表里没有的时区也走那里的兜底逻辑。
     private static let timeZoneCityNames: [String: String] = [
         "UTC": "UTC", "Etc/UTC": "UTC", "GMT": "GMT", "Etc/GMT": "GMT",
         "Asia/Shanghai": "北京",
@@ -403,8 +446,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         "Africa/Nairobi": "内罗毕"
     ]
 
+    /// 时区短名。中文界面用上面的中文城市名表，表里没有时退回 IANA 标识符最后一段
+    /// （Asia/Kathmandu → Kathmandu）；英文界面不直译那张表，直接落到 IANA 短名
+    /// （America/Los_Angeles → Los Angeles），比意译更自然也更可预期。
+    /// 两种语言都保留兜底：认不出的标识符原样返回，不崩。
     private static func shortTimeZoneName(_ timeZone: TimeZone) -> String {
-        if let known = timeZoneCityNames[timeZone.identifier] {
+        if AppLanguage.isChinese, let known = timeZoneCityNames[timeZone.identifier] {
             return known
         }
         let last = timeZone.identifier.split(separator: "/").last.map(String.init)
