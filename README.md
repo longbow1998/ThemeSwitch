@@ -1,188 +1,151 @@
 # ThemeSwitch
 
-一个 macOS 菜单栏小工具：**按你指定的时区、在你指定的两个时间点自动切换系统深浅色**，并可选地在菜单栏显示指定时区的日期 / 星期 / 时间。
+**English** | [简体中文](README.zh-CN.md)
 
-## 为什么需要它
+A tiny macOS menu bar utility that **switches the system light/dark appearance at two times you choose, evaluated in a timezone you choose**, and can optionally show a clock (date, weekday, 24-hour time) of any timezone next to its menu bar icon.
 
-macOS 自带的「外观 → 自动」是**按系统时区的日出日落**切换的。这在正常情况下够用，但有两种场景会出问题：
+## Why this exists
 
-- **系统时区与真实所在地不一致**（例如为了网络环境把系统时区设成海外，但人在国内）——自带的自动切换会在"错误的"日出日落时变暗
-- **需要固定的作息时间**——比如希望每天 19:00 转暗、05:00 转亮，而不是跟着季节变化的日出日落
+macOS's built-in "Auto" appearance switches at **sunrise/sunset of your system timezone**. That is usually fine, but it breaks in two situations:
 
-ThemeSwitch 完全独立于系统时区工作：它用你自己选定的时区来判断，因此不受系统时区设置影响。
+- **Your system timezone does not match where you actually live** — for example you set the system timezone to an overseas one for network reasons while you are physically elsewhere. The built-in auto switch then flips at the "wrong" sunrise and sunset.
+- **You want a fixed schedule** — e.g. dark at 19:00 and light at 05:00 every day, instead of tracking a sunrise that drifts through the year.
 
-## 功能
+ThemeSwitch works completely independently of the system timezone: it evaluates everything in a timezone *you* pick, so your system timezone setting has no effect on it.
 
-- 自选时区 + 两个时间点，自动切换深浅色
-- 可选**菜单栏时钟**：在图标后显示指定时区的「日期 + 星期 + 24 小时制时间」
-- 设置窗口带**时区换算提示**：把当前设定换算成参考时区的当地时间，一眼看懂对应关系
-- 菜单栏菜单显示当前状态与下次切换时间（同样按参考时区换算）
-- **手动切换会暂停自动切换**：点「立即切换为深色 / 浅色」后，直到下一个计划切换时刻都不再自动干预，
-  菜单里能看到暂停状态、也能一键恢复自动切换
-- 可配置**登录自启**（优先用系统的 `SMAppService`，未签名场景自动回退到 LaunchAgent）
-- **单实例保护**：重复启动不会在菜单栏出现多个图标
-- **界面中英双语，且可在 App 内切换**：默认跟随系统语言（系统语言是中文时显示简体中文，其余一律英文，默认语言 `en`），
-  也可在设置里锁定为 `English` 或 `简体中文` —— 选定后无视系统语言，菜单、设置窗口、弹窗与错误提示都用该语言，
-  菜单栏时钟的日期格式、星期名与时区显示名也跟着走（两种语言都是 24 小时制）
-- 纯菜单栏（无 Dock 图标），无第三方依赖
+## Features
 
-## 系统要求
+- Pick a timezone and two times; the appearance switches automatically
+- Optional **menu bar clock**: date + weekday + 24-hour time of a timezone you choose, shown after the icon
+- **Timezone conversion hints** in the settings window: your chosen times are shown alongside the same moments in a reference timezone you care about
+- The menu shows the current state and the next switch time (also converted to the reference timezone)
+- **Manual toggling pauses the schedule**: after you pick "Switch to Dark/Light Mode" from the menu, the app leaves the appearance alone until the next planned switch. The menu shows the paused state and offers a one-click resume.
+- Configurable **launch at login** (uses the system `SMAppService` API, with an automatic LaunchAgent fallback for unsigned builds)
+- **Single-instance guard**: launching it again will not create a second menu bar icon
+- **Bilingual UI (English / Simplified Chinese), switchable in-app**: follows the system language by default (Simplified Chinese for Chinese systems, English for everything else — `en` is the development region), and can also be pinned to `English` or `简体中文` in the settings. Once pinned it overrides the system language for the menu, settings window, alerts and the menu bar clock, including date format, weekday names and timezone display names (24-hour in both languages).
+- Menu bar only (no Dock icon), no third-party dependencies
 
-- macOS 13.0 或更高
-- 构建需要 Xcode Command Line Tools（`xcode-select --install`）
+## Requirements
 
-## 安装
+- macOS 13.0 or later
+- Building requires the Xcode Command Line Tools (`xcode-select --install`)
 
-### 从源码构建
+## Installation
+
+### Build from source
 
 ```bash
 git clone https://github.com/longbow1998/ThemeSwitch.git
 cd ThemeSwitch
-./install.sh          # 构建并安装到 /Applications
-./install.sh --launch-at-login   # 额外设置登录自启
+./install.sh                     # build and install into /Applications
+./install.sh --launch-at-login   # additionally register it as a login item
 ```
 
-卸载：
+Uninstall:
 
 ```bash
-./uninstall.sh            # 保留配置
-./uninstall.sh --purge    # 同时清除配置
+./uninstall.sh            # keeps your configuration
+./uninstall.sh --purge    # also removes the configuration
 ```
 
-### 从 Release 下载
+### Download a release
 
-到 [Releases](https://github.com/longbow1998/ThemeSwitch/releases) 下载 `ThemeSwitch.zip`，解压后把 `ThemeSwitch.app` 拖进 `/Applications`。
+Grab `ThemeSwitch.zip` from [Releases](https://github.com/longbow1998/ThemeSwitch/releases), unzip it and drag `ThemeSwitch.app` into `/Applications`.
 
-> **首次打开会被 Gatekeeper 拦下**——本项目使用 ad-hoc 签名（没有 Apple 开发者证书），
-> 下载后系统会提示"无法验证开发者"。解决办法是**右键点 App → 打开**，或执行：
+> **Gatekeeper will block the first launch.** This project is ad-hoc signed (there is no Apple Developer certificate), so macOS reports that the developer cannot be verified. Either **right-click the app → Open**, or run:
 >
 > ```bash
 > xattr -dr com.apple.quarantine /Applications/ThemeSwitch.app
 > ```
 
-**注意**：Release 里的二进制目前是 **Apple Silicon（arm64）** 构建，Intel Mac 请从源码构建。
+**Note**: the release binary is currently **Apple Silicon (arm64)** only. On an Intel Mac, build from source.
 
-### 仅构建
+### Build only
 
 ```bash
 ./build.sh
-# 产物：build/ThemeSwitch.app
+# output: build/ThemeSwitch.app
 ```
 
-## 使用
+## Usage
 
-1. 启动后菜单栏出现一个图标（☀️ / 🌙 随当前深浅色变化）
-2. 点图标 → **设置…**
-3. 在设置里配置：
-   - **时区**：判断时段所用的时区
-   - **参考时区**：换算提示与菜单「下次切换」所参照的时区（建议设成你自己的真实时区）
-   - **切换时间**：转暗 / 转亮两个时间点
-   - **菜单栏时钟**（可选）：开启后菜单栏显示日期 / 星期 / 时间；设置窗口里实时预览所选时区的当前时间，
-     时钟关闭时也会照常显示（只是弱化并标注「已关闭」），所以改时区随时都能看到效果
-   - **界面语言**（可选）：跟随系统 / English / 简体中文；点「保存」后立即生效（菜单、菜单栏时钟、弹窗、设置窗口）
+1. After launching, an icon appears in the menu bar (☀️ / 🌙 depending on the current appearance)
+2. Click it → **Settings…**
+3. Configure:
+   - **Time zone** — the timezone used to evaluate the two switch times
+   - **Reference time zone** — the timezone used for the conversion hints and the menu's "next switch" line (set this to the timezone you actually care about)
+   - **Switch times** — when to turn dark and when to turn light
+   - **Menu Bar Clock** (optional) — shows date / weekday / time after the icon. The settings window previews the selected timezone live; the preview keeps showing the time even when the clock is turned off (dimmed and labelled "clock is off"), so changing the timezone always gives visible feedback.
+   - **Interface language** (optional) — Follow System / English / 简体中文. Takes effect immediately after Save (menu, menu bar clock, alerts, settings window).
 
-### 举个例子
+### A worked example
 
-人在国内（UTC+8），但系统时区设成了 `America/Los_Angeles`（UTC-7），希望北京时间 19:00 转暗、05:00 转亮：
+You live in UTC+8, but your system timezone is set to `America/Los_Angeles` (UTC−7). You want the appearance to turn dark at 19:00 Beijing time and light at 05:00 Beijing time:
 
-| 设置项 | 值 |
+| Setting | Value |
 | --- | --- |
-| 时区 | `America/Los_Angeles` |
-| 转暗 | `04:00` |
-| 转亮 | `14:00` |
-| 参考时区 | `Asia/Shanghai` |
-| 菜单栏时钟 | 开启，时区 `Asia/Shanghai` |
+| Time zone | `America/Los_Angeles` |
+| Switch to dark | `04:00` |
+| Switch to light | `14:00` |
+| Reference time zone | `Asia/Shanghai` |
+| Menu bar clock | on, timezone `Asia/Shanghai` |
 
-设置窗口会实时显示换算结果，确认 `04:00 = 北京 19:00`、`14:00 = 北京 05:00`。
+The settings window shows the conversion live, so you can confirm `04:00 = 19:00 Beijing` and `14:00 = 05:00 Beijing`.
 
-## 文件结构
+## Project layout
 
 ```
 Sources/
-  main.swift                 程序入口
-  Config.swift               配置模型与持久化（UserDefaults）、时钟文案格式化、当前界面语言
-  LanguageOverride.swift     界面语言的运行时覆盖（交换 bundle 查表 + 语言判定）
-  Schedule.swift             时区感知的时段计算
-  AppearanceController.swift 读写系统外观
-  ManualOverride.swift       手动切换的覆盖窗口（暂停自动切换的状态）
-  AppDelegate.swift          菜单栏图标、菜单、定时器
-  SettingsWindow.swift       设置窗口（SwiftUI）
+  main.swift                 Entry point
+  Config.swift               Config model + persistence (UserDefaults), clock formatting, current UI language
+  LanguageOverride.swift     Runtime override of the UI language (bundle lookup exchange + language resolution)
+  Schedule.swift             Timezone-aware schedule computation
+  AppearanceController.swift Reads/writes the system appearance
+  ManualOverride.swift       Manual-toggle override window (the paused state)
+  AppDelegate.swift          Menu bar icon, menu, timers
+  SettingsWindow.swift       Settings window (SwiftUI)
 Resources/
-  en.lproj/Localizable.strings      英文文案（默认语言）
-  zh-Hans.lproj/Localizable.strings 简体中文文案（key 与 en 完全一致）
-Info.plist                   App bundle 信息（CFBundleDevelopmentRegion=en、CFBundleLocalizations）
-build.sh                     构建脚本（编译 + 拷贝 .lproj + ad-hoc 签名）
-install.sh / uninstall.sh    安装与卸载
+  en.lproj/Localizable.strings      English strings (default language)
+  zh-Hans.lproj/Localizable.strings Simplified Chinese strings (keys identical to en)
+Info.plist                   App bundle metadata (CFBundleDevelopmentRegion=en, CFBundleLocalizations)
+build.sh                     Build script (compile + copy .lproj + ad-hoc sign)
+install.sh / uninstall.sh    Install and uninstall
 ```
 
-## 工作原理
+## How it works
 
-- **时段判断**：把当前时刻换算到配置时区，与两个时间点比较（支持跨午夜区间）
-- **切换外观**：调用
+- **Schedule evaluation** — the current moment is converted into the configured timezone and compared against the two times (midnight-crossing ranges supported)
+- **Switching the appearance** — calls
   ```
   osascript -e 'tell application "System Events" to tell appearance preferences to set dark mode to <true|false>'
   ```
-  首次使用可能需要在「系统设置 → 隐私与安全性 → 自动化」里允许本 App 控制 System Events
-- **配置存储**：`~/Library/Preferences/com.themeswitch.app.plist`（UserDefaults）
-- **界面语言**：默认跟随系统（`CFBundleLocalizations` 只声明了 `en` / `zh-Hans`，因此繁体中文等其它系统语言都走英文）。
-  在设置里选定具体语言后，运行时会交换 `Bundle.main` 的 `localizedString(forKey:value:table:)`，
-  改从对应的 `<lang>.lproj` 子 bundle 取文案（`NSLocalizedString` 一侧，覆盖菜单、弹窗、窗口标题等），
-  并给设置窗口的 SwiftUI 视图挂上对应的环境 `locale`（`Text("key")` 一侧）；
-  语言判定集中在 `AppLanguage`，时钟日期格式、星期名与时区显示名都跟着它走。
-  选「跟随系统」或取不到 `.lproj` 时完全走系统原本的查表路径
-- **无网络访问**，所有逻辑本地完成
+  On first use you may need to allow this app to control System Events under System Settings → Privacy & Security → Automation
+- **Configuration storage** — `~/Library/Preferences/com.themeswitch.app.plist` (UserDefaults)
+- **UI language** — follows the system by default (`CFBundleLocalizations` only declares `en` / `zh-Hans`, so other system languages such as Traditional Chinese fall back to English). When a specific language is pinned in the settings, the app exchanges `Bundle.main`'s `localizedString(forKey:value:table:)` at runtime so AppKit lookups (`NSLocalizedString`, covering the menu, alerts and window titles) read from the matching `<lang>.lproj` sub-bundle, and sets the corresponding environment `locale` on the SwiftUI settings view (`Text("key")` lookups). Language resolution is centralised in `AppLanguage`, which also drives the clock date format, weekday names and timezone display names. Choosing "Follow System", or a missing `.lproj`, falls back to the system's normal lookup path.
+- **No network access** — everything happens locally
 
-### 手动切换与自动切换的关系
+### Manual vs. automatic switching
 
-自动切换是**收敛式**的：App 每 8 秒（以及每次系统唤醒时）算一遍「按计划现在该是什么颜色」，
-发现和当前状态不一致就拉回去。好处是休眠、重启、改系统时钟之后都能自愈，
-代价是**手动切换会被立刻拉回**。所以引入了一个「手动覆盖窗口」：
+The automatic schedule is **convergent**: every 8 seconds (and on every system wake) the app computes what the appearance *should* be according to the schedule and pulls it back if it differs. That self-heals after sleep, reboot or system clock changes — but it also means a manual toggle would be reverted almost immediately. Hence the **manual override window**:
 
-- 在菜单里点「立即切换为深色 / 浅色」时，除了切换外观，还会记下一个**到期时间戳**：
-  下一次计划切换时刻（用 `Schedule.nextSwitch` 算，记在 UserDefaults 里，与配置分开存）
-- 在这个时刻之前，App 完全不动外观 —— 手动选择被尊重
-  - 例：计划 19:00 转暗 / 05:00 转亮，你 22:00 手动切成亮色 → 22:00 到次日 05:00 一直保持亮色
-  - 次日 05:00 计划目标本来就是亮色，无事发生；19:00 计划目标变暗 → 自动切暗，回归
-- 到点后覆盖自动失效，重新按计划收敛，**不需要任何操作**
-- 覆盖期间菜单首行写明「自动切换已暂停（至 05:00 恢复）」、菜单栏图标叠一个暂停角标，
-  菜单里还有一项「恢复自动切换」可以立刻结束暂停
+- Picking "Switch to Dark/Light Mode" from the menu both switches the appearance and records an **expiry timestamp**: the next planned switch time (computed with `Schedule.nextSwitch`, stored in UserDefaults separately from the configuration)
+- Until that moment the app leaves the appearance completely alone, so your manual choice is respected
+  - Example: schedule is dark at 19:00 / light at 05:00, and you manually switch to light at 22:00 → it stays light from 22:00 until 05:00 the next day
+  - At 05:00 the scheduled target is already light, so nothing happens; at 19:00 the target becomes dark and the app switches back, returning to the schedule
+- When the window expires the override simply lapses and the schedule resumes — **no action needed**
+- While paused, the first menu line reads "Auto switching paused (resumes at 05:00)", the menu bar icon carries a small pause badge, and a "Resume Auto Switching" item ends the pause immediately
 
-关键点是覆盖只是「一个到期时间戳 + 窗口内跳过收敛」，**不是把手动切换变成一次性触发**：
-调度的收敛语义没变，所以休眠或关机跨过切换时刻之后依然能自愈
-（比如合盖跨过 05:00，唤醒后 8 秒内就按计划对齐）。
-两个时间点相同时没有「下一次计划切换」，此时不进入暂停，直接切就行。
+The key point is that the override is just *an expiry timestamp plus skipping convergence inside that window* — it does **not** turn the schedule into a one-shot trigger. The convergent semantics are unchanged, so sleeping or shutting down across a switch time still self-heals (e.g. closing the lid over 05:00, and the appearance is aligned within 8 seconds of waking). If both times are equal there is no "next planned switch", so no pause is entered — the toggle just switches.
 
-## 已知限制
+## Known limitations
 
-- 切换依赖 `osascript`，因此需要「自动化」权限；未授权时切换会静默失败（菜单里的「立即切换」同样受影响）
-- 时段精度为轮询间隔（约 8 秒），切换时刻可能有数秒误差
-- 切换界面语言后菜单、菜单栏时钟、弹窗与设置窗口都立即用新语言；但**已经显示出来的** AppKit 对象
-  （例如正开着的警告框）不会中途换语言，重新打开或重启 App 即可
-- 时区显示名分语言：中文界面用内置的常用时区中文名映射表（少见时区取系统给出的中文名），
-  英文界面直接用 IANA 标识符最后一段（`America/Los_Angeles` → `Los Angeles`）；
-  两者都保留兜底，认不出的标识符原样显示、不崩
-- 手动切换只在自动切换**启用**时进入暂停状态；停用时本来就不会自动干预，不存在暂停一说
-- 设置窗口的高度上限是「屏幕可用高度 − 上下边距 − 标题栏」，内容放不下时窗口本身不再变高，
-  改为在表单区域滚动；「恢复默认 / 取消 / 保存」固定在窗口底部、不参与滚动，任何屏幕尺寸下都点得到
+- Switching relies on `osascript`, so the Automation permission is required; without it the switch fails silently (the menu's manual switch is affected too)
+- Schedule precision is the polling interval (about 8 seconds), so a switch may be a few seconds late
+- After changing the UI language, the menu, clock, alerts and settings window all use the new language immediately; AppKit objects that are **already on screen** (such as an open alert) do not change language mid-flight — reopen or restart the app
+- Timezone display names are language-specific: the Chinese UI uses a built-in table of common Chinese city names (falling back to the system's Chinese name), while the English UI uses the last segment of the IANA identifier (`America/Los_Angeles` → `Los Angeles`). Both keep a fallback so an unrecognised identifier is shown verbatim rather than crashing.
+- Manual toggling only enters the paused state while automatic switching is **enabled**; when it is disabled there is nothing to pause
+- The settings window's height is capped at "visible screen height − margins − title bar". When the content does not fit, the window stops growing and the form area scrolls instead; the Reset / Cancel / Save row is pinned to the bottom of the window and never scrolls, so it stays clickable at any screen size.
 
-## 开源许可
+## License
 
 [MIT](LICENSE)
-
----
-
-# English
-
-A tiny macOS menu bar utility that **switches the system light/dark appearance at two times you choose, evaluated in a timezone you choose**, and can optionally show a clock (date, weekday, 24-hour time) of any timezone next to its menu bar icon.
-
-Unlike the built-in "Auto" appearance — which follows sunrise/sunset of your **system** timezone — ThemeSwitch is fully independent of it. Useful when your system timezone differs from where you actually live, or when you want a fixed schedule.
-
-Features: configurable timezone and switch times, optional menu bar clock, timezone conversion hints in the settings window, no third-party dependencies. The settings window never grows taller than the screen's visible area — the form scrolls instead, and the Reset / Cancel / Save row stays pinned to the bottom of the window so it is always clickable.
-
-The interface is bilingual (English / Simplified Chinese). It follows the system language by default (English is the default language, `CFBundleDevelopmentRegion`), so every system language other than Chinese gets the English UI — and it can also be pinned in-app to `English` or `简体中文` from the settings window, which then overrides the system language for the menu, the clock, alerts and the settings window itself. The clock format, weekday names and time zone names follow the same app language (24-hour in both languages). Product strings live in `Resources/en.lproj/Localizable.strings` and `Resources/zh-Hans.lproj/Localizable.strings`; the in-app choice is applied at runtime by exchanging `Bundle.main`'s localized lookup and by setting the SwiftUI environment locale.
-
-Manually toggling the appearance from the menu pauses the automatic schedule until the next planned switch time (the menu shows the pause state and offers a one-click resume). The schedule itself stays convergent, so sleeping, rebooting, or changing the system clock still self-heals.
-
-Requires macOS 13+. Build with `./build.sh`, install with `./install.sh`.
-
-Licensed under the [MIT License](LICENSE).
