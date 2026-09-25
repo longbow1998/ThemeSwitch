@@ -1,0 +1,73 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+    tags: ['v*']
+  pull_request:
+  workflow_dispatch:
+
+# 打 tag 时要创建 Release，需要写权限
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: 构建 ThemeSwitch.app
+    runs-on: macos-15
+
+    steps:
+      - name: 检出代码
+        uses: actions/checkout@v4
+
+      - name: 显示工具链版本
+        run: |
+          sw_vers
+          echo "--- swiftc ---"
+          swiftc --version
+          echo "--- xcodebuild ---"
+          xcodebuild -version
+
+      - name: 类型检查
+        run: swiftc -typecheck Sources/*.swift
+
+      - name: 构建 App
+        run: ./build.sh
+
+      - name: 验证产物
+        run: |
+          APP=build/ThemeSwitch.app
+          test -x "$APP/Contents/MacOS/ThemeSwitch" || { echo "可执行文件缺失"; exit 1; }
+          plutil -lint "$APP/Contents/Info.plist"
+          file "$APP/Contents/MacOS/ThemeSwitch"
+          # 确认它是纯菜单栏 App（无 Dock 图标）
+          test "$(/usr/libexec/PlistBuddy -c 'Print :LSUIElement' "$APP/Contents/Info.plist")" = "true"
+          echo "版本: $(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")"
+
+      - name: 打包
+        run: |
+          cd build
+          # ditto 能正确保留 .app 的 bundle 结构与符号链接（zip -r 会破坏签名）
+          ditto -c -k --keepParent ThemeSwitch.app ThemeSwitch.zip
+          shasum -a 256 ThemeSwitch.zip | tee ThemeSwitch.zip.sha256
+          ls -lh ThemeSwitch.zip
+
+      - name: 上传构建产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ThemeSwitch-${{ github.sha }}
+          path: |
+            build/ThemeSwitch.zip
+            build/ThemeSwitch.zip.sha256
+          if-no-files-found: error
+
+      - name: 发布 Release
+        # 只在推送 v* tag 时执行
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            build/ThemeSwitch.zip
+            build/ThemeSwitch.zip.sha256
+          generate_release_notes: true
+          draft: false
