@@ -53,7 +53,13 @@ cd ThemeSwitch
 
 ### 从 Release 下载
 
-到 [Releases](https://github.com/longbow1998/ThemeSwitch/releases) 下载 `ThemeSwitch.zip`，解压后把 `ThemeSwitch.app` 拖进 `/Applications`。
+每个 [Release](https://github.com/longbow1998/ThemeSwitch/releases) 提供三个文件：
+
+| 文件 | 说明 |
+| --- | --- |
+| `ThemeSwitch.dmg` | **推荐**。打开后把 `ThemeSwitch.app` 拖到 `Applications` 快捷方式上即可 |
+| `ThemeSwitch.zip` | 纯 App 包，适合脚本化安装 |
+| `checksums.txt` | 上面两个文件的 SHA-256 校验和 |
 
 > **首次打开会被 Gatekeeper 拦下**——本项目使用 ad-hoc 签名（没有 Apple 开发者证书），
 > 下载后系统会提示"无法验证开发者"。解决办法是**右键点 App → 打开**，或执行：

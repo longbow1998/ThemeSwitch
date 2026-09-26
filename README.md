@@ -50,7 +50,13 @@ Uninstall:
 
 ### Download a release
 
-Grab `ThemeSwitch.zip` from [Releases](https://github.com/longbow1998/ThemeSwitch/releases), unzip it and drag `ThemeSwitch.app` into `/Applications`.
+Each [release](https://github.com/longbow1998/ThemeSwitch/releases) ships three files:
+
+| File | What it is |
+| --- | --- |
+| `ThemeSwitch.dmg` | **Recommended.** Open it and drag `ThemeSwitch.app` onto the `Applications` shortcut. |
+| `ThemeSwitch.zip` | The plain app bundle, for scripted installs. |
+| `checksums.txt` | SHA-256 of both files above. |
 
 > **Gatekeeper will block the first launch.** This project is ad-hoc signed (there is no Apple Developer certificate), so macOS reports that the developer cannot be verified. Either **right-click the app → Open**, or run:
 >

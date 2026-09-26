@@ -47,10 +47,57 @@ jobs:
       - name: 打包
         run: |
           cd build
-          # ditto 能正确保留 .app 的 bundle 结构与符号链接（zip -r 会破坏签名）
+
+          # 1) zip —— ditto 能正确保留 .app 的 bundle 结构与符号链接（zip -r 会破坏签名）
           ditto -c -k --keepParent ThemeSwitch.app ThemeSwitch.zip
-          shasum -a 256 ThemeSwitch.zip | tee ThemeSwitch.zip.sha256
-          ls -lh ThemeSwitch.zip
+
+          # 2) dmg —— 内含 App 与指向 /Applications 的快捷方式，打开后拖拽即装
+          rm -rf dmg-stage && mkdir -p dmg-stage
+          cp -R ThemeSwitch.app dmg-stage/
+          ln -s /Applications dmg-stage/Applications
+
+          # 新版 macOS 用 diskutil image create（体积更小）；
+          # 老版本没有这个子命令时回退到 hdiutil（macOS 27 起标记弃用但依然可用）
+          if diskutil image create from dmg-stage --volumeName "ThemeSwitch" \
+               --format UDZO ThemeSwitch.dmg >/dev/null 2>&1; then
+            echo "DMG 由 diskutil 生成"
+          else
+            echo "diskutil 不可用，回退 hdiutil"
+            hdiutil create -volname "ThemeSwitch" -srcfolder dmg-stage \
+              -ov -format UDZO ThemeSwitch.dmg
+          fi
+          rm -rf dmg-stage
+
+          # 3) 校验和
+          shasum -a 256 ThemeSwitch.zip ThemeSwitch.dmg | tee checksums.txt
+
+          ls -lh ThemeSwitch.zip ThemeSwitch.dmg
+
+      - name: 验证 DMG
+        run: |
+          cd build
+          # 镜像本身完整
+          hdiutil verify ThemeSwitch.dmg
+
+          # 挂载到固定挂载点，避免解析 hdiutil 输出（不同 macOS 版本格式不一致）
+          MOUNT_POINT=/tmp/themeswitch-dmg
+          hdiutil detach "$MOUNT_POINT" -quiet 2>/dev/null || true
+          rm -rf "$MOUNT_POINT" && mkdir -p "$MOUNT_POINT"
+          hdiutil attach ThemeSwitch.dmg -nobrowse -quiet -mountpoint "$MOUNT_POINT"
+
+          test -d "$MOUNT_POINT/ThemeSwitch.app" || { echo "DMG 里缺少 ThemeSwitch.app"; exit 1; }
+          test -L "$MOUNT_POINT/Applications"     || { echo "DMG 里缺少 Applications 快捷方式"; exit 1; }
+          test -x "$MOUNT_POINT/ThemeSwitch.app/Contents/MacOS/ThemeSwitch" || { echo "App 可执行文件缺失"; exit 1; }
+
+          # DMG 内 App 版本须与源码 Info.plist 一致
+          SRC_VER=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' ../Info.plist)
+          DMG_VER=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$MOUNT_POINT/ThemeSwitch.app/Contents/Info.plist")
+          echo "源码版本: $SRC_VER / DMG 内版本: $DMG_VER"
+          test "$SRC_VER" = "$DMG_VER" || { echo "DMG 内 App 版本与源码不一致"; exit 1; }
+
+          hdiutil detach "$MOUNT_POINT" -quiet
+          rm -rf "$MOUNT_POINT"
+          echo "DMG 内容校验通过"
 
       - name: 上传构建产物
         uses: actions/upload-artifact@v7
@@ -58,7 +105,8 @@ jobs:
           name: ThemeSwitch-${{ github.sha }}
           path: |
             build/ThemeSwitch.zip
-            build/ThemeSwitch.zip.sha256
+            build/ThemeSwitch.dmg
+            build/checksums.txt
           if-no-files-found: error
 
       - name: 发布 Release
@@ -67,7 +115,8 @@ jobs:
         uses: softprops/action-gh-release@v3
         with:
           files: |
+            build/ThemeSwitch.dmg
             build/ThemeSwitch.zip
-            build/ThemeSwitch.zip.sha256
+            build/checksums.txt
           generate_release_notes: true
           draft: false
